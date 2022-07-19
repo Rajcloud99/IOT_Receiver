@@ -1,0 +1,497 @@
+
+const devices = require('../config').devices;
+// const tbs = require('../services/telegramBotService');
+const crc16 = require('node-crc-itu');
+
+const path = require('path');
+
+class adapter{
+
+    static get model_name() {
+        return path.basename(__filename).split('.')[0];
+    }
+
+    constructor(device) {
+        this.device = device;
+
+    }
+
+    /*******************************************
+     PARSE THE INCOMING STRING FROM THE DEVICE
+     You must return an object with a least: device_id, cmd and type.
+     return device_id: The device_id
+     return cmd: command from the device.
+     return type: login_request, ping, etc.
+     *******************************************/
+    parse_data(data) {
+        const dataHex = data.toString('hex');
+        const parts = {};
+        parts.start = dataHex.substr(0, 4);
+        let len = 2;
+        if (parts.start === '7979') len = 4;
+        parts.length = dataHex.substr(4, len);
+        parts.cmd = dataHex.substr(4 + len, 2);
+        parts.data = dataHex.substr(6 + len, dataHex.length - (18 + len));
+        parts.serial = dataHex.substr(dataHex.length - 12, 4);
+        parts.error = dataHex.substr(dataHex.length - 8, 4);
+        parts.stop = dataHex.substr(dataHex.length - 4);
+
+        const error_code = this.get_error_code(parts.length + parts.cmd + parts.data + parts.serial);
+
+        /* if (error_code !== parts.error) {
+             //TODO fix error code
+             //console.log('error code not matched',parts.cmd,parts.action,error_code,parts.error);
+             // winston.info('data crc check fail for calc error_code ' + error_code + ' and actual ' + parts.error, parts);
+             return false;
+         }
+         */
+        /*
+          Login Information                          0x01
+          Positioning Data(UTC)                      0x22
+          Heartbeat Packet                           0x13
+          Online Command Response of Terminal        0x21
+          Alarm Data(UTC)                            0x26
+          GPS Address Inquiry Packet(UTC)            0x2A
+          LBS Address Inquiry Packet                 0x17
+          Online Command                             0x80
+          Time Check Packet                          0x8A
+          Information Transmission Packet            0x94
+         */
+        switch (parts.cmd) {
+            case '01':
+                parts.action = "login_request";
+                parts.device_id = parseInt(parts.data.substr(0,16));
+                parts.mic = parts.data.substr(16,4);
+                parts.tz = parts.data.substr(20,4);
+                break;
+            case '22':
+                parts.action = "ping";
+                break;
+            case '26':
+                parts.action = "alarm";
+                break;
+            case '27':
+                parts.action = "alarm";
+                break;
+            default:
+                parts.action = "other";
+        }
+        return parts;
+    }
+
+    run_other(cmd, msg_parts) {
+        switch (cmd) {
+            case "13": //Handshake
+                this.device.receive_handshake(msg_parts);
+                this.authorize(msg_parts);
+                break;
+            case '21': // string info
+                this.device.receive_string_info(msg_parts);
+                break;
+            case '19': // string info
+                //this.device.receive_others(msg_parts);
+                //this.authorize(msg_parts);
+                break;
+            case '17':
+                this.device.receive_string_info(msg_parts);
+                break;
+
+        }
+    }
+
+    authorize(msg_parts) {
+        let msg = '05' + msg_parts.cmd + msg_parts.serial;
+        msg += this.get_error_code(msg);
+        msg = msg_parts.start + msg + msg_parts.stop;
+        this.send_command(msg);
+    }
+
+    request_login_to_device() {
+    }
+
+    receive_alarm(msg_parts) {
+
+        this.authorize(msg_parts);
+
+        const str = msg_parts.data;
+
+        const data = {
+            date: str.substr(0, 12),
+            info_length: parseInt(str.substr(12, 1), 16),
+            satellites: parseInt(str.substr(13, 1), 16),
+            lat: this.get_coordinate_from_hex(str.substr(14, 8), this.get_course_status(str, 5) === '1' ? 'N' : 'S'),
+            lng: this.get_coordinate_from_hex(str.substr(22, 8), this.get_course_status(str, 4) === '1' ? 'W' : 'E'),
+            speed: parseInt(str.substr(30, 2), 16),
+            real_time: this.get_course_status(str, 2) !== '1',
+            course: this.get_course(str),
+            mcc: parseInt(str.substr(39, 3), 16),
+            mnc: parseInt(str.substr(42, 2), 16),
+            lac: str.substr(44, 4),
+            cid: str.substr(48, 6),
+            oil_power_dc: this.get_terminal_info(str, 7) === '1',
+            gps_tracking: this.get_terminal_info(str, 6) === '1',
+            alarm_code_phone: this.get_terminal_info(str, 3) + this.get_terminal_info(str, 4) + this.get_terminal_info(str, 5),
+            charge_on: this.get_terminal_info(str, 2) === '1',
+            acc_high: this.get_terminal_info(str, 1) === '1',
+            defense_activated: this.get_terminal_info(str, 0) === '1',
+            voltage: parseInt(str.substr(56, 2), 16),
+            gsm_signal_str: parseInt(str.substr(58, 2), 16) * 25, // 0 - 4
+            alarm_code_terminal: str.substr(60, 2),
+            language: str.substr(62, 2),
+            device_id: this.device.getUID()
+        };
+
+        let datetime = "20" + parseInt(data.date.substr(0, 2), 16) +
+            "/" + parseInt(data.date.substr(2, 2), 16) +
+            "/" + parseInt(data.date.substr(4, 2), 16);
+        datetime += " " + parseInt(data.date.substr(6, 2), 16) +
+            ":" + parseInt(data.date.substr(8, 2), 16) +
+            ":" + parseInt(data.date.substr(10, 2), 16);
+        datetime += ' +0800';
+        data.datetime = new Date(datetime).getTime();
+
+        data.alarm_phone = this.get_alarm_phone(data.alarm_code_phone);
+        data.alarm_terminal = this.get_alarm_terminal(data.alarm_code_terminal);
+        this.device.ping(data, true);
+
+        return data.alarm_terminal;
+    }
+
+    receive_handshake(msg_parts) {
+        const str = msg_parts.data;
+
+        const data = {
+            oil_power_dc: this.get_terminal_info_heartbeat(str, 7) === '1',
+            gps_tracking: this.get_terminal_info_heartbeat(str, 6) === '1',
+            alarm_code_phone: this.get_terminal_info_heartbeat(str, 3) + this.get_terminal_info_heartbeat(str, 4) + this.get_terminal_info_heartbeat(str, 5),
+            charge_on: this.get_terminal_info_heartbeat(str, 2) === '1',
+            acc_high: this.get_terminal_info_heartbeat(str, 1) === '1',
+            defense_activated: this.get_terminal_info_heartbeat(str, 0) === '1',
+            voltage: parseInt(str.substr(2, 2), 16),
+            gsm_signal_str: parseInt(str.substr(4, 2), 16) * 25,  // 0 - 4
+            alarm_code_terminal: str.substr(6, 2),
+            language: str.substr(8, 2),
+            device_id: this.device.getUID()
+        };
+
+
+
+        data.datetime = Date.now();
+        data.alarm_phone = this.get_alarm_phone(data.alarm_code_phone);
+        data.alarm_terminal = this.get_alarm_terminal(data.alarm_code_terminal);
+       // this.device.updateBooleanReport('acc', data.acc_high, data.datetime);
+
+        return data;
+    }
+    receive_others(msg_parts) {
+        const str = msg_parts.data;
+
+        const data = {
+            oil_power_dc: this.get_terminal_info_heartbeat(str, 7) === '1',
+            gps_tracking: this.get_terminal_info_heartbeat(str, 6) === '1',
+            alarm_code_phone: this.get_terminal_info_heartbeat(str, 3) + this.get_terminal_info_heartbeat(str, 4) + this.get_terminal_info_heartbeat(str, 5),
+            charge_on: this.get_terminal_info_heartbeat(str, 2) === '1',
+            acc_high: this.get_terminal_info_heartbeat(str, 1) === '1',
+            defense_activated: this.get_terminal_info_heartbeat(str, 0) === '1',
+            voltage: parseInt(str.substr(2, 2), 16),
+            gsm_signal_str: parseInt(str.substr(4, 2), 16) * 25,  // 0 - 4
+            alarm_code_terminal: str.substr(6, 2),
+            language: str.substr(8, 2),
+            device_id: this.device.getUID()
+        };
+
+
+
+        data.datetime = Date.now();
+        data.alarm_phone = this.get_alarm_phone(data.alarm_code_phone);
+        data.alarm_terminal = this.get_alarm_terminal('01');
+
+        //this.device.updateBooleanReport('acc', data.acc_high, data.datetime);
+        return data.alarm_terminal;
+        //return data;
+    }
+    receive_string_info(msg_parts) {
+        // winston.info(JSON.stringify(msg_parts));
+        let data = msg_parts.data;
+        const response = {};
+        response.status = 'OK';
+        response.request = 'commands';
+        response.device_id = this.device.getUID();
+
+        for (let i = 0; i < devices.length; i++) {
+            if (devices[i].key === this.device.model_name) {
+                response.command_type = Object.keys(devices[i].value.sms)[parseInt(data.substr(2, 8))];
+                break;
+            }
+        }
+
+        data = data.substr(10, data.length - 14);
+        data = new Buffer(data, 'hex');
+        data = data.toString();
+        response.message = data;
+        if (response.command_type === 'location') {
+            response.data = this.parse_get_location(data);
+        }
+        return response;
+    }
+
+    parse_get_location(data) {
+        data = data.split('!');
+        if(data[1]){
+            data = data[1].substr(1);
+        }else{
+            data = data[0];
+        }
+        data = data.split(',');
+        const response = {};
+        response.device_id = this.device.getUID();
+        for (let i in data) {
+            const content = data[i].split(':');
+            switch (content[0]) {
+                case 'Lat':
+                    response.lat = content[1];
+                    response.lat = response.lat.charAt(0) === 'N' ? parseFloat(response.lat.substr(1)) : -1 * parseFloat(response.lat.substr(1));
+                    break;
+                case 'Lon':
+                    response.lng = content[1];
+                    response.lng = response.lng.charAt(0) === 'E' ? parseFloat(response.lng.substr(1)) : -1 * parseFloat(response.lng.substr(1));
+                    break;
+                case 'Course':
+                    response.course = parseInt(content[1]);
+                    break;
+                case 'Speed':
+                    response.speed = parseInt(content[1]);
+                    break;
+                case 'DateTime':
+                    response.datetime = new Date(content[1] + ':' + content[2] + ':' + content[3] + ' +0800').getTime();
+                    break;
+            }
+        }
+        response.datetime = Date.now();
+        return response;
+    }
+
+    get_ping_data(msg_parts) {
+        const str = msg_parts.data;
+
+        const data = {
+            date: str.substr(0, 12),
+            info_length: parseInt(str.substr(12, 1), 16),
+            satellites: parseInt(str.substr(13, 1), 16),
+            lat: this.get_coordinate_from_hex(str.substr(14, 8), this.get_course_status(str, 5) === '1' ? 'N' : 'S'),
+            lng: this.get_coordinate_from_hex(str.substr(22, 8), this.get_course_status(str, 4) === '1' ? 'W' : 'E'),
+            speed: parseInt(str.substr(30, 2), 16),
+            real_time: this.get_course_status(str, 2) !== '1',
+            gps_tracking: this.get_course_status(str, 3) === '1',
+            course: this.get_course(str),
+            mcc: parseInt(str.substr(37, 3), 16),
+            mnc: parseInt(str.substr(40, 2), 16),
+            lac: str.substr(42, 4),
+            cid: str.substr(46, 6),
+            device_id: this.device.getUID()
+        };
+
+        if (data.length === 60) {
+            data.mileage = parseInt(str.substr(52, 8));
+        }
+
+        let year = "20" + parseInt(data.date.substr(0, 2), 16);
+        let month = parseInt(data.date.substr(2, 2), 16);
+        if(month.toString() && month.toString().length === 1){
+            month= "0"+month.toString();
+        }
+        let day = parseInt(data.date.substr(4, 2), 16);
+        if(day.toString() && day.toString().length === 1){
+            day= "0"+day.toString();
+        }
+        let hr = parseInt(data.date.substr(6, 2), 16);
+        if(hr.toString() && hr.toString().length === 1){
+            hr= "0"+hr.toString();
+        }
+        let min = parseInt(data.date.substr(8, 2), 16);
+        if(min.toString() && min.toString().length === 1){
+            min= "0"+min.toString();
+        }
+        let sec = parseInt(data.date.substr(10, 2), 16);
+        if(sec.toString() && sec.toString().length === 1){
+            sec= "0"+sec.toString();
+        }
+        let datetime = year + "-" + month + "-" + day + "T" +hr+":"+min+":"+sec+".000Z";
+        data.datetime = new Date(datetime).getTime();
+        return data;
+    }
+
+    getCommandCustom(flag, command) {
+        //78 78 6E 17 68 00 0000 01 41 44 44 52 45 53 53 26 26 4F 4D 7F 6E 00 3A 5E 7F 4E 1C 77 01 00 2E 60 E0 5D DE 5E 02 00 2E 60 E0 57 CE 53 3A 00 2E 4E 91 5C 71 89 7F 8D EF 00 2E 79 BB 60 E0 5D DE 5E 02 5B 66 59 27 65 59 80 B2 7E A6 00 32 00 35 7C 73 00 2E 26 26 38 36 31 33 34 32 31 36 33 32 36 39 39 00 00000000000000 23 23 00 16 C1 EC 0D 0A
+        const start = '7878';
+        const cmd = '80';
+        const serverflagbit = flag;
+        const commandcontent = Buffer.from(command).toString('hex');
+        // winston.info(commandcontent);
+        let lengthofcommand = ((serverflagbit + commandcontent).length / 2).toString(16);
+        lengthofcommand = lengthofcommand.length < 2 ? '0' + lengthofcommand : lengthofcommand;
+        // winston.info(lengthofcommand);
+        const content = lengthofcommand + serverflagbit + commandcontent;
+        let length = (parseInt(lengthofcommand, 16) + 6).toString(16);
+        length = length.length < 2 ? '0' + length : length;
+        const serial = '00A0';
+        // winston.info(length, cmd, content, serial);
+        const error = this.get_error_code(length + cmd + content + serial);
+        const end = '0D0A';
+        return start + length + cmd + content + serial + error + end;
+    }
+
+    get_location() {
+        this.sendCommand('location');
+    }
+
+    sendCommand(type, param) {
+        let command;
+        let num;
+        for (let i = 0; i < devices.length; i++) {
+            if (devices[i].key === this.device.model_name) {
+                command = devices[i].value.sms[type];
+                num = Object.keys(devices[i].value.sms).indexOf(type);
+                break;
+            }
+        }
+        num = '00000000' + num;
+        num = num.substr(num.length - 8);
+        if (param) command = command.replace("%20", param);
+        this.send_command(this.getCommandCustom(num, command));
+    }
+
+    /* INTERNAL FUNCTIONS */
+
+    send_command(msg) {
+        //console.log('sending:'+msg);
+        this.device.send(this.format_data(msg));
+    }
+
+    format_data(params) {
+        return new Buffer(params, 'hex');
+    }
+
+    get_error_code(msg) {
+        const crc = crc16(msg, 'hex');
+        let hexString = crc.toString(16);
+        if (hexString.length !== 4) {
+            hexString = '0000' + hexString;
+            hexString = hexString.substr(hexString.length - 4);
+        }
+        return hexString;
+    }
+
+    get_coordinate_from_hex(coordHex, sign) {
+        const deg = parseInt((parseInt(coordHex, 16) / 30000) / 60);
+        let min = (parseInt(coordHex, 16) / 30000) % 60;
+        min = this.round(min, 4);
+        let res = (min / 60) + deg;
+        res = this.round(res, 4);
+        return (sign.toUpperCase() === "S" || sign.toUpperCase() === "W") ? res * -1 : res;
+    }
+
+    round(value, decimals) {
+        return Number(Math.round(value + 'e' + decimals) + 'e-' + decimals);
+    }
+
+    get_course_status(str, pos) {
+        return this.get_binary_string(str.substr(32, 4)).charAt(pos);
+    }
+
+    get_course(str) {
+        let course = this.get_binary_string(str.substr(32, 4));
+        course = course.substr(6);
+        return parseInt(course, 2);
+    }
+
+    get_terminal_info(str, pos) {
+        return this.get_binary_string(str.substr(54, 2)).charAt(pos);
+    }
+
+    get_terminal_info_heartbeat(str, pos) {
+        return this.get_binary_string(str.substr(0, 2)).charAt(pos);
+    }
+
+    get_binary_string(hexString) {
+        let length = hexString.length;
+        let binaryString = '';
+        length = length / 2;
+        for (let i = 0; i < length; i++) {
+            const str = '00000000' + parseInt(hexString.substr(i * 2, 2), 16).toString(2);
+            binaryString += str.substr(str.length - 8);
+        }
+        return binaryString;
+    }
+
+    get_alarm_phone(alarm_code) {
+        let alarm;
+        switch (alarm_code) {
+            case "000":
+                alarm = {
+                    "code": "normal",
+                    "msg": "Normal"
+                };
+                break;
+                /*
+            case "001":
+                alarm = {
+                    "code": "accident",
+                    "msg": "The vehicle suffers a sudden jerk or an accident."
+                };
+                break;
+                */
+            case "010":
+                alarm = {
+                    "code": "power_cut",
+                    "msg": "Power Cut"
+                };
+                break;
+            case "011":
+                alarm = {
+                    "code": "low_battery",
+                    "msg": "Low Battery"
+                };
+                break;
+            case "100":
+                alarm = {
+                    "code": "sos",
+                    "msg": "Driver sends a S.O.S."
+                };
+                break;
+            default:
+                alarm = {
+                    "code": "XXX",
+                    "msg": "Default alarm."
+                };
+                break;
+        }
+        return alarm;
+    }
+
+    get_alarm_terminal(alarm_code) {
+        let alarm;
+        switch (alarm_code) {
+            case "01":
+                alarm = 'sos';
+                break;
+                /*
+            case "02":
+                alarm = 'power_cut';
+                break;
+            case "03":
+                alarm = 'accident';
+                break;
+                 */
+            case "04":
+                alarm = 'fence_in';
+                break;
+            case "05":
+                alarm = 'fence_out';
+                break;
+        }
+        return alarm;
+    }
+}
+
+module.exports = adapter;

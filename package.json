@@ -1,0 +1,38 @@
+{
+  "name": "gps-receiver",
+  "version": "0.0.1",
+  "description": "GPS receiver app",
+  "dependencies": {
+    "async": "*",
+    "axios": "^0.18.1",
+    "body-parser": "^1.17.2",
+    "binutils64": "~0.1.2",
+    "cassandra-driver": "*",
+    "chai": "^4.0.2",
+    "config": "*",
+    "crc": "^3.8.0",
+    "crc-itu": "^0.1.0",
+    "node-crc-itu": "^0.1.0",
+    "cron": "*",
+    "express": "*",
+    "fcm-node": "*",
+    "geolib": "~3.3.1",
+    "mocha": "^3.4.2",
+    "mockery": "*",
+    "node-telegram-bot-api": "^0.27.1",
+    "node.extend": "^2.0.0",
+    "nodemailer": "^4.0.1",
+    "request": "*",
+    "sinon": "*",
+    "socket.io": "^2.0.3",
+    "socket.io-client": "^2.0.3",
+    "split": "*",
+    "winston": "*",
+    "ws": "^5.2.2",
+    "point-in-polygon": "~1.1.0"
+  },
+  "scripts": {
+    "start": "node app.js",
+    "updateInventoryDist": "node %NODE_DEBUG_OPTION% ./scripts/updateInventoryDist"
+  }
+}
