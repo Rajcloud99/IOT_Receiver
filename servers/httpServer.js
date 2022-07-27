@@ -28,16 +28,9 @@ app.configureHeaders = function () {
     });
 };
 
-app.configureRoutes = function () {
-    //const authUtil = require('./utils/authUtil');
-    app.use('/api/deviceCon', require('../controller/deviceConn'));
-    app.use('/api/deviceDist', require('../controller/deviceDist'));
-};
-
 app.initialize = function () {
     app.configureUtilities();
     app.configureHeaders();
-    app.configureRoutes();
 }();
 
 const server = app.listen(serverConfig.database.http_port, function () {

@@ -1715,24 +1715,6 @@ module.exports = {
 
         }
     },
-    "wsDriver":{
-        "port":5002,
-        "perMessageDeflate": {
-            "zlibDeflateOptions": {
-                "chunkSize": 1024,
-                "memLevel": 7,
-                "level": 3
-            },
-            "zlibInflateOptions": {
-                "chunkSize": 10240
-            },
-            "clientNoContextTakeover": true,
-            "serverNoContextTakeover": true,
-            "serverMaxWindowBits": 10,
-            "concurrencyLimit": 10,
-            "threshold": 1024
-        }
-    },
     "cronJobs" :{
         "dailyKM" :{
             "time" : '00 00 03 * * *'
