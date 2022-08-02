@@ -1,5 +1,5 @@
 
-CREATE KEYSPACE gps_ups WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '2'}  AND durable_writes = true;
+CREATE KEYSPACE gps_ups WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;
 
 CREATE TYPE gps_ups.alarm (
     name text,
