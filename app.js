@@ -10,22 +10,15 @@ const winston = require('./utils/logger');
 require('./utils/externalip').getIpAsync().then(function(ip){
 	const externalip = ip;
 	let isProductionServer = false,isTestServer=false;
-	if(ip === '52.77.111.181' || ip ==='65.1.183.173'){
-		isProductionServer = true;
-		process.env.NODE_ENV = 'truckadda';
-	}
-	if(ip ==='65.2.22.132'){
-		isTestServer = true;
-		process.env.NODE_ENV = 'trucku';
-	}
-	//const isProductionServer = (ip === '52.77.111.181');
-	//const isTestServer = (ip === '52.77.145.71');
+
 	const isDevelopServer = (ip === 'localhost');
 
 	if(isDevelopServer) {
 		process.env.NODE_ENV = 'develop';
 	}
-
+	isTestServer = true;
+	process.env.NODE_ENV = 'test';
+    //TODO check config
 	require('./utils/dbConf').isDBLocal = false;
 	const config = require('./config');
 	config.shouldConnectToDb = true;
@@ -44,7 +37,6 @@ require('./utils/externalip').getIpAsync().then(function(ip){
 	return Promise.resolve();
 }).then(() => {
     return Promise.resolve();
-	//if(require('./config').isProductionServer) return require('./utils/cassandra').markAllDevicesAsOfflineAsync();
 }).then(() => {
     require('./utils/initiate.js');
 });
