@@ -1,6 +1,6 @@
 const winston = require('winston');
 //winston.emitErrs = true;
-const logger = new (winston.Logger)({
+const logger = winston.createLogger({
 	transports: [
 		new (winston.transports.Console)({
 			handleExceptions: true,
