@@ -509,5 +509,6 @@ module.exports = {
         "dailyKM" :{
             "time" : '00 00 03 * * *'
         }
-    }
+    },
+    "notification":{}
 };
