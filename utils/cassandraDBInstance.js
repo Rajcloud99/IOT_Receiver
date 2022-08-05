@@ -13,7 +13,8 @@ if (!config.shouldConnectToDb) {
 	const cassandraDriver = require('cassandra-driver');
 	cassandraDbInstance = new cassandraDriver.Client({
 		contactPoints: database.nodes,
-		keyspace: database.keyspace
+		keyspace: database.keyspace,
+		localDataCenter: 'datacenter1'//todo change as for your name
 	});
 }
 
