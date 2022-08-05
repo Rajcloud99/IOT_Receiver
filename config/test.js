@@ -7,8 +7,10 @@ module.exports = {
     },
     "lms":{
         lmsService:true,
-        host:"IP",
-        port:"3011",
-        server_intercommunication_key:"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJrZ"
+        host:"3.110.92.242",
+        port:"3002",
+        userAllowedForLiveFeedForAll:true,
+        userAllowedForTripForAll:true,
+        server_intercommunication_key:"eyJrZXkiOiJncHNnYWFkaSIsInRpbWUiOjE1MjIwMTA0OTgxNjJ9.0kD2fPtK2cybSL1rU51_azToU_SEr_TcNXPOzKgUxyA"
     }
 };
