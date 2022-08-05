@@ -11,6 +11,7 @@
     "chai": "^4.0.2",
     "config": "*",
     "crc": "^3.8.0",
+    "crc-itu": "^0.1.0",
     "node-crc-itu": "^0.1.0",
     "cron": "*",
     "express": "*",
@@ -26,7 +27,7 @@
     "socket.io": "^2.0.3",
     "socket.io-client": "^2.0.3",
     "split": "*",
-    "winston": "^3.8.1",
+    "winston": "*",
     "ws": "^5.2.2",
     "point-in-polygon": "~1.1.0"
   },

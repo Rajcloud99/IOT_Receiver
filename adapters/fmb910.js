@@ -539,7 +539,7 @@ class adapter{
             if(msg_parts.aData[i].alarm){
                 alarm_code = msg_parts.aData[i].alarm;
                 data.location = msg_parts.aData[i];
-                console.log('FMB 910 receive_alarm',alarm_code);
+                //console.log('FMB 910 receive_alarm',alarm_code);
                 break;
             }
         }

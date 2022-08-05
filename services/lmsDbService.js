@@ -5,7 +5,7 @@ winston.info("enable lms service : ", lms.lmsService,lms.host +":"+ lms.port);
 const tbs = require('../services/telegramBotService');
 let options = {
     method: 'POST',
-    url:  "http://"+lms.host+":"+lms.port+"/api/gpsIntegration/getGeofences",
+    url:  "http://"+lms.host+":"+lms.port+"/api/gpsIntegration/getTripGeofences",
     headers:
         {
             'content-type': 'application/json'
@@ -24,8 +24,11 @@ module.exports.getGeofencesAsync = function(device_id) {
         });
     });
 };
+
 function getGeofences(device_id,callback) {
     options.body.device_id = device_id;
+    options.url = "http://"+lms.host+":"+lms.port+"/api/gpsIntegration/getTripGeofences";
+    options.body.request_id = 'DT-'+Math.floor(Math.random() * 100000);
     if (lms.lmsService) {
         request.post(options, function(error,response,body){
             if (error) {
@@ -37,15 +40,16 @@ function getGeofences(device_id,callback) {
 
         });
     }else{
-        //winston.info('lmsService  disabled');
+        callback(null,[]);
     }
-    return 1;
 };
+
 module.exports.updateGrGeofences = function(l_id,oUpdate,callback) {
     tbs.sendMessage(l_id + " update geofence");
     options.url = "http://"+lms.host+":"+lms.port+"/api/gpsIntegration/updateGrGeofence";
         options.body.l_id = l_id;
         options.body.modified = oUpdate;
+        options.body.request_id = Math.floor(Math.random() * 100000);
             if (lms.lmsService) {
                 request.post(options, function(error,response,body){
                     if (error) {
@@ -55,17 +59,18 @@ module.exports.updateGrGeofences = function(l_id,oUpdate,callback) {
                         console.log(l_id + " update geofence success");
                         callback(error,response);
                     }else{
-                        return;
+                        if(callback) callback(null,{status:"OK","message":"No response from server"});
                     }
                 });
             }else{
+                if(callback) callback(null,{status:"OK","message":"No geofence config set on server"});
                 winston.info('lmsService  disabled');
             }
-            return 1;
 };
 
 module.exports.updateTripGeofences = function(l_id,oUpdate,callback) {
     console.log('update Trip geofence');
+    options.body.request_id = oUpdate.request_id;
     options.url = "http://"+lms.host+":"+lms.port+"/api/gpsIntegration/updateTripGeofence";
     options.body.l_id = l_id;
     options.body.modified = oUpdate;
@@ -81,10 +86,11 @@ module.exports.updateTripGeofences = function(l_id,oUpdate,callback) {
             }
         });
     }else{
+        if(callback) callback(null,{status:"OK","message":"No geofence config set on server"});
         winston.info('lmsService  disabled');
     }
-    return 1;
 };
+
 function cb(error,resp){
     winston.info(error);
 }

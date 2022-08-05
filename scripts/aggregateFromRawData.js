@@ -12,7 +12,7 @@ config.externalip = '65.1.183.173';
 
 //config.externalip = '52.77.111.181';
 
-const start = new Date('2021-07-28');
+const start = new Date('2022-07-20');
 
 process.env.TZ = 'Asia/Calcutta';
 const dateutils = require('../utils/dateutils');

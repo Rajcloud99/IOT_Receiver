@@ -79,7 +79,7 @@ class adapter{
                 ew:str[7],
                 speed: parseInt(str[8]),
                 gps_tracking : true,
-                course: 0,
+                course: parseFloat(str[9]),
                 ignition:oInputStatus.ignition,
                 voltage:str[15],
                 mnc:str[22],

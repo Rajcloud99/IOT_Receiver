@@ -25,6 +25,7 @@ const lmsDbService = require('./services/lmsDbService');
 const emailService = require('./services/emailService');
 const PointInPolygon = require('./utils/pointInsidePolygoan');
 const setDistToCurrent = require('./scripts/setDistToCurrent');
+
 /*************************************************************
 
  THE DEVICE CLASS
@@ -211,7 +212,25 @@ class Device {
 		/************************************
 		 EXECUTE ACTION
 		 ************************************/
-		this.make_action(msg_parts.action, msg_parts);
+		let that = this;
+		if(msg_parts.action == 'ping' && msg_parts.aData && msg_parts.aData.length){
+			let aGPSData = msg_parts.aData;//copy this
+			//console.log('multi data array fmb',aGPSData.length);
+			async.eachSeries(aGPSData, function(datum, cb){
+				msg_parts.data = datum;
+				if (that.getUID() == that.logOne) {
+                     console.log('msg_parts.data.f_lvl',msg_parts.data.fl,msg_parts.data.f_lvl);
+				}
+				that.make_action(msg_parts.action, msg_parts);
+				cb();
+			}, function(err){
+				if(err){
+					console.error('async.eachSeries multiple data fmb',err.message);
+				}
+			});
+		}else{
+			this.make_action(msg_parts.action, msg_parts);
+		}
 	}
 
 	debug_data_packet(data, msg_parts) {
@@ -299,7 +318,7 @@ class Device {
 	ping(data, isParsed, callback) {
 		if (this.processingPing){
 			//TODO make some process async to avoid loss of packets
-			console.log('already processing',this.getUID(),this.model_name);
+			//console.log('already processing',this.getUID(),this.model_name);
 			//return;
 		} 
 		this.processingPing = true;
@@ -312,7 +331,7 @@ class Device {
 	handlePing(data, isParsed, callback) {
 		const gps_data = isParsed ? data : this.adapter.get_ping_data(data);
 		if(this.getUID() == this.logOne){
-			console.log('ping from ',this.reg_no,this.getUID());
+			console.log('ping from ',this.reg_no,this.getUID(),gps_data.fl,gps_data.f_lvl);
 		}
 		if (!gps_data || !this.validateGpsData(gps_data)) {
 			if (this.logAll || this.getUID() === this.logOne) winston.info("GPS Data can't be parsed. Discarding packet...");
@@ -329,6 +348,10 @@ class Device {
 			cb => {
 				this.fetchUserDetails(gps_data, cb);
 			},
+			cb => {
+				this.getTripAlarms(cb);
+			},
+
 		], (err, res) => {
 			if (err) {
 				if (this.logAll || this.getUID() === this.logOne) winston.error('parallel error '+ this.getUID(), err.stack);
@@ -342,6 +365,9 @@ class Device {
 				}else{
                    // if (this.logAll || this.getUID() === this.logOne) winston.error(gps_data.lat,gps_data.lng);
                     callback();
+					if(this.getUID() === this.logOne){
+						console.log('f_lvl,m_fact,fl at handlePing',gps_data.f_lvl,this.fuel_sensor_m_fact,gps_data.fl);
+					}
 					gps_data.user_id = this.user_id;
                     gps_data.model_name = this.model_name;
 					gps_data.aGpsgaadi = this.aGpsgaadi;
@@ -355,7 +381,8 @@ class Device {
                                 lmsPingInt = Date.now() - new Date(this.latestLocation.pingToLMS).getTime();
                                 lmsPingInt = lmsPingInt/60000;
                             }
-                            if(!(this.latestLocation && this.latestLocation.pingToLMS) || lmsPingInt > 10){//min
+							let condC1 = !(this.latestLocation && this.latestLocation.pingToLMS);
+                            if(this.latestLocation && ( condC1 || lmsPingInt > 10)){//min
                                 gps_data.user_id = this.user_id;
                                 gps_data.model_name = this.model_name;
 								this.latestLocation.pingToLMS = new Date();
@@ -370,7 +397,9 @@ class Device {
                     });
 				}
 			}).catch(err => {
-				if(err!='old data') console.error('on processPingDataAsync '+gps_data.device_id ,err);
+				if(err!='old data') {
+					//console.error('on processPingDataAsync '+gps_data.device_id ,err);
+				}
 				callback(err);
 			});
 		});
@@ -378,7 +407,8 @@ class Device {
 
 	validateGpsData(gps_data) {
 		if(gps_data.gps_tracking == false && this.model_name == 'ais140'){
-			console.error('gps_tracking 0',gps_data.device_id, new Date(gps_data.datetime));
+			//TODO check hardware
+			//console.error('gps_tracking 0',gps_data.device_id, new Date(gps_data.datetime));
 			return false;
 		}
 		if(gps_data.lat > 90 || gps_data.lat < - 90){
@@ -392,8 +422,8 @@ class Device {
        	return false;
 		}
         if(gps_data.datetime && new Date(gps_data.datetime).getTime() > (new Date().getTime() + 600000)){//10 early min check
-			console.error('data in future for ',gps_data.device_id, new Date(gps_data.datetime));
-            return false;
+			//TODO check timezone of device
+			return false;
 		}
 		if(gps_data.datetime && ((new Date(gps_data.datetime).getTime() + 14400000) < new Date().getTime())){//3 hrs (3*60*60*1000)
 			//console.error('3 or more hr old data ',this.reg_no,this.model_name, gps_data.device_id, new Date(gps_data.datetime));
@@ -418,7 +448,7 @@ class Device {
 	initiateLatestLocationIfStopped(gps_data, callback) {
 		if (this.latestLocation) return callback();
 		dbUtils.getAsync(database.table_device_inventory, ['location_time', 'lat', 'lng', 'positioning_time', 'reg_no', 'last_alert_type', 'last_alert_time',
-			'address','odo','dist_today','user_id','driver_name','driver_name2','rfid1','rfid2','driver','acc_high','acc_high_time','power_supply','power_supply_time','sens_fl'], {imei: this.getUID()})
+			'address','odo','dist_today','user_id','driver_name','driver_name2','rfid1','rfid2','driver','acc_high','acc_high_time','power_supply','power_supply_time','sens_fl','f_lvl'], {imei: this.getUID()})
 			.then(device => {
 				device = device[0];
 
@@ -449,6 +479,9 @@ class Device {
 				}
 				if(device.sens_fl){
 					this.fuel_sensor_m_fact = device.sens_fl;
+				}
+				if(device.f_lvl){
+					this.f_lvl = device.f_lvl;
 				}
                /*
                 //check if acc_high changed for current coordinate
@@ -482,7 +515,7 @@ class Device {
 						this.latestLocation.datetime = new Date(device.positioning_time).getTime();
 						this.latestLocation.imei = this.getUID();
 						this.lastLocationTime = this.latestLocation.datetime;
-					}else if(dist < 1000000){ //ignore if device was offline for more than 1000 KM
+					}else if(dist < 1300000){ //ignore if device was offline for more than 1000 KM
 						//TODO calculate offline dist from map my india
 						this.dist_today = this.dist_today + dist;
 					}
@@ -492,11 +525,6 @@ class Device {
 				if(this.getUID() == this.logOne){
 					console.log('initiateLatestLocationIfStopped from',this.reg_no,this.getUID(),this.user_id,this.model_name);
 				}
-				//get alarms from lms only when device owner identified
-				if(this.user_id == 'annu@ispat' || this.user_id == 'WCPL' || this.user_id == 'churi' || this.user_id == 'annunict' || this.user_id == 'SIPL'){
-					this.getTripAlarms();
-				}
-
 			})
 			.catch(err => {
 				console.error('initiateLatestLocationIfStopped catch ',err.message);
@@ -545,6 +573,10 @@ class Device {
             callback('invalid GPS data on insertion');
             return;
 		}
+	   //TODO cross check why not updating f_lvl in first place
+		if(this.fuel_sensor_m_fact && gps_data.fl && !gps_data.f_lvl){
+			gps_data.f_lvl = this.fuel_sensor_m_fact * gps_data.fl;
+		}
 		gps_data.inserted = Date.now();
 		/*
 		//check ignition from latestLocation
@@ -581,6 +613,7 @@ class Device {
         if(this.aGpsgaadi && this.aGpsgaadi.length && gps_data.lat && prepareAPIdata){
 			prepareAPIdata(this.aGpsgaadi,gps_data);
 		}
+
 		if (gps_data.datetime < this.lastLocationTime) { //Ignore old data as it will break our reports TODO = check
 			//console.log('old data ',this.getUID(),new Date(gps_data.datetime));
 			if (this.logAll || this.getUID() === this.logOne) winston.error('old data ' + this.getUID() , new Date(gps_data.datetime).toLocaleString(), '<', new Date(this.lastLocationTime).toLocaleString());
@@ -621,7 +654,7 @@ class Device {
 				 Otherwise it would have been removed in the previous call of this function, at this point.
 				 Other solution would be to track the abovementioned scenario, but what the heck.
 				 */
-				console.error('invalid data speed > 160',this.getUID(),dur,dist,gps_data.gps_tracking,gps_data.lat,gps_data.lng);
+				//console.error('invalid data speed > 160',this.getUID(),dur,dist,gps_data.gps_tracking,gps_data.lat,gps_data.lng);
 				this.latestLocation = null;
 				if (this.logAll || this.getUID() === this.logOne) winston.error('invalid data');
 				callback('invalid data for speed');
@@ -682,7 +715,6 @@ class Device {
 			this.processPowerSupplyData(gps_data);
 		}
 
-
 		if(this.odo){
             gps_data.odo = this.odo + this.dist_today;
 		}else{
@@ -699,6 +731,10 @@ class Device {
 			gps_data.power_supply = this.latestPower.power_supply;
 		}
 
+		if(this.f_lvl && gps_data.f_lvl){
+			this.processFuelData(getCopy(gps_data));
+		}
+
 		this.latestLocation = gps_data;
 
         this.latestLocation.status = 'online';
@@ -708,16 +744,18 @@ class Device {
         this.updateDeviceInventory();
 
 		this.processAggregatedDrivesAndStopsReport(getCopy(gps_data));
+
 		if(this.model_name == 'ais140' || this.model_name == 'm2c2025' || this.model_name == 'fmb910' ){
 			//this.processOverspeedDurationReportV2(getCopy(gps_data));
 			//this.processNightDriveReport(getCopy(gps_data));
 			//this.processIdleDriveReport(getCopy(gps_data));
 			//this.processNeutralDriveReport(getCopy(gps_data));
 		}
+
 		if(this.model_name == 'ais140'){
 			//this.processSeatBeltReport(getCopy(gps_data));
 		}
-		this.processOverspeedReport(getCopy(gps_data));
+		//this.processOverspeedReport(getCopy(gps_data));
 		callback();
 	}
 
@@ -743,7 +781,7 @@ class Device {
 		} else {
 			oGPSData = this.adapter.receive_alarm(data);
 			if (oGPSData && oGPSData.alarm_terminal) {
-				console.log('oGPSData.alarm_terminal', oGPSData.alarm_terminal,this.model_name);
+				//console.log('oGPSData.alarm_terminal', oGPSData.alarm_terminal,this.model_name);
 				alarm_code = oGPSData.alarm_terminal;
 			}
 		}
@@ -856,8 +894,12 @@ class Device {
 				}
 			});
 			alarmService.sendAlerts(alarm);
-			if(that.user_id == 'annu@ispat' || that.user_id == 'WCPL' || that.user_id == 'churi' || that.user_id == 'annunict' || that.user_id == 'SIPL'){
-				emailService.sendAlertMails(getCopy(alarm));
+			if(config.lms && config.lms.userAllowedForTripForAll){
+				//emailService.sendAlertMails(getCopy(alarm));
+			}else if(config.lms && config.lms.userAllowedForTrip && config.lms.userAllowedForTrip.length){
+				if(config.lms.userAllowedForTrip.indexOf(that.user_id ) > -1){
+					//emailService.sendAlertMails(getCopy(alarm));
+				}
 			}
 		}
 	}
@@ -1689,6 +1731,22 @@ class Device {
 		}
 	}
 
+	processFuelData(data){
+		//todo check with duration
+     	let dur = (data.datetime - this.latestLocation.datetime) / 1000;
+		 if(dur < 1200){//20*60 20 min
+			 //check only for
+			 let diffLvl =  data.f_lvl - this.f_lvl;
+			 if(diffLvl > 5){
+				 //refilling
+				 tbs.sendMessage('Fuel refilling ' + this.reg_no + " " + diffLvl);
+			 }else if(diffLvl < -5){
+				 tbs.sendMessage('Fuel Draining ' + this.reg_no + " " + diffLvl);
+			 }
+		 }
+		this.f_lvl = data.f_lvl;
+	}
+
 	handleDisconnection() {
 		if(this.getUID()){
 			if(this.getUID() == this.logOne){
@@ -1790,55 +1848,46 @@ class Device {
 	}
 
 	getTripAlarms(done) {
-        if(this.model_name === 'atlanta_e101'){
-		//if(this.user_id === 'DGFC' || this.user_id === 'kamal' || this.user_id == 'annu@ispat'){
-            lmsDbService.getGeofencesAsync(this.getUID())
+		if(done && this.tripAlertSettings && this.tripAlertSettings.length){
+			return done();
+		}
+		let that = this;
+		let bUserCond = false;
+
+	 if(config.lms && config.lms.userAllowedForTripForAll){
+		 bUserCond = true;
+	 }else if(this.aGpsgaadi) {
+			for (let g = 0; g < this.aGpsgaadi.length; g++) {
+				let uid = this.aGpsgaadi[g].user_id;
+				if (config.lms && config.lms.userAllowedForTrip && config.lms.userAllowedForTrip.length) {
+					if (config.lms.userAllowedForTrip.indexOf(uid) > -1) {
+						bUserCond = true;
+						break;
+					}
+				}
+			}
+		}
+
+        if(bUserCond && this.model_name === 'atlanta_e101'){
+	        lmsDbService.getGeofencesAsync(this.getUID())
                 .then(geofence_points => {
                     if (!geofence_points) throw new Error('no geofence_points');
-                    this.tripAlertSettings = [];
-					console.log('geofence_points found for trip alarm',this.user_id,JSON.stringify(geofence_points));
+					that.tripAlertSettings = [];
+					console.log('geofence_points found for trip alarm',this.user_id,this.getUID(),geofence_points.length);
                     for (let i = 0; i < geofence_points.length; i++) {
                         if (!geofence_points[i].geozone) continue;
                         geofence_points[i].ptype = 'circle';
                         geofence_points[i].user_id = this.user_id;
                         geofence_points[i].imei = this.getUID();
                         delete geofence_points[i].geozone[0]._id;
-                        this.tripAlertSettings.push(geofence_points[i]);
+						that.tripAlertSettings.push(geofence_points[i]);
                     }
                 }).catch(err => {
             }).then(() => {
-                // tbs.sendMessage(this.reg_no, 'valid trip geozones:', this.tripAlertSettings.length);
                 if (done) done();
             });
 		}else{
             if (done) done();
-		}
-
-	}
-
-	getSensorData(done) {
-		let that = this;
-		if(this.model_name === 'fmb920'){
-			let oSensorFilter = {
-				device:this.getUID()
-			};
-			sensorService.getSensorAsync(oSensorFilter)
-				.then(oSensorData => {
-					if (!oSensorData && !oSensorData.m_fact) {
-						throw new Error('no aSensorData');
-					}else{
-						that.sensorData = oSensorData;
-						tbs.sendMessage(JSON.stringify(oSensorData));
-						console.log('oSensorData found ',this.user_id,JSON.stringify(oSensorData));
-					}
-
-				}).catch(err => {
-			}).then(() => {
-				// tbs.sendMessage(this.reg_no, 'valid trip aSensorData:', this.tripAlertSettings.length);
-				if (done) done();
-			});
-		}else{
-			if (done) done();
 		}
 
 	}
@@ -1849,7 +1898,7 @@ class Device {
             });
         }
 
-        if (this.latestLocation && this.tripAlertSettings) {
+        if (this.latestLocation && this.tripAlertSettings && this.tripAlertSettings.length) {
             this.findEligibleLmsGeozones(data, () => {
             });
         }
@@ -2013,6 +2062,7 @@ class Device {
         }
 		oAlarm.entered = is_inside;
         if (shouldUpdate) {
+			callback(null, oAlarm);
             let modify = {
                 is_inside: oAlarm.is_inside,
                 location_buffer: oAlarm.location_buffer
@@ -2020,29 +2070,21 @@ class Device {
             if(isEvent) {
             	modify.events = geofence_status;
             }
-		    if(oAlarm.geofence_type === 'GR' || oAlarm.geofence_type === 'Gr'){
-                console.log(isEvent,is_inside,oAlarm.is_inside,is_inside !== oAlarm.is_inside,'2');
-                //console.log(modify.events);
-				//send callback
-				 callback(null, oAlarm);
-				//sent callback to snychonise
-                lmsDbService.updateGrGeofences(oAlarm._id,modify);
-			}else if(oAlarm.geofence_type == 'TRIP' || oAlarm.geofence_type == 'Trip'){
-				console.log('geofence update in lms',oAlarm._id,JSON.stringify(modify));
+		   if(oAlarm.geofence_type == 'TRIP' || oAlarm.geofence_type == 'Trip'){
+				console.log('geofence update in lms',oAlarm._id);
+				modify.request_id = oPing.datetime;
                 lmsDbService.updateTripGeofences(oAlarm._id,modify,function(err,resp){
-					//send callback
-					 callback(null, oAlarm);
-					//sent callback to snychonise
+					console.log('updateTripGeofences resp');
 					if(resp && resp.message == 'reCheckTripGeofence'){
                        that.getTripAlarms();
 					}
+					//callback(null, oAlarm);
 				});
 			}
         }else{
 			if (!entry && !exit) return callback(new Error('not geofence event'));
 			callback(null, oAlarm);
 		}
-
     }
 
 	findEligibleGeozones(data, callback) {
@@ -2253,14 +2295,13 @@ class Device {
 					alarm.code = 'exit';
 					alarm.msg = this.reg_no + " exit from geofence " + oAlarm.name;
 				}
-
+              //go to next iteration
+				if(done) done();
 				addressService.upsertAlerts(alarm, (err, resp) => {
 					if (err) {
 						tbs.sendMessage('upsertAlerts error findEligibleLmsGeozones ', err.toString());
 						console.error('upsertAlerts error', err);
 					}
-					//go to next
-					done();
 				});
 				//end save alert
                 /*
@@ -2335,9 +2376,12 @@ class Device {
                 }
                 */
             }).catch(err => {
-                done();
+                if(done) done();
             });
         }, err => {
+			if(err){
+				console.error('findEligibleLmsGeozones error ',err.message);
+			}
             callback();
         });
     }

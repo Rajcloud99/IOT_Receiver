@@ -503,3 +503,27 @@ exports.processRawDataForIdling = function(data,callback) {
 	}
 	return aAdas;
 };
+
+exports.processRawDataForFuelRefillDrain = function(imei,data) {
+	let fuelChange = [];
+	for (let i = 1; i < data.length; i++) {
+       if(data[i].fl && data[i-1].fl) {
+		   let diffInLtr = data[i].fl - data[i - 1].fl;
+		   let dur = data[i].datetime - data[i -1].datetime;//ms
+		   dur = dur/1000; //sec
+
+		   if (diffInLtr > 10 && dur < 360) {//less than 60 min
+			   //refill
+			   //TODO check for next 10 min
+			   fuelChange.push(data[i]);
+			   console.log('refill', diffInLtr);
+		   } else if (diffInLtr < -10 && dur < 360) {
+			   //drain
+			   //TODO check for next 10 min
+			   fuelChange.push(data[i]);
+			   console.log('drain', diffInLtr);
+		   }
+	   }
+	}
+	return  fuelChange;
+};

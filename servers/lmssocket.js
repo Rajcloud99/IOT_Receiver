@@ -6,7 +6,7 @@ const net = require('net');
 const split = require('split');
 const winston = require('../utils/logger');
 const telegramBotService = require('../services/telegramBotService');
-const serverConfig = require('../config');
+const config = require('../config');
 const sockets = {};
 const port = 5007;
 const servers = require('./servers');
@@ -37,7 +37,7 @@ const server = net.createServer(function(socket){
     ip = ip[ip.length-1];
     sockets[ip] = socket;
     socket.id = Math.floor(Math.random() * 1000);
-    telegramBotService.sendMessage(serverConfig.externalip + ' socket client connected: ' + socket.id,ip);
+    telegramBotService.sendMessage(config.externalip + ' socket client connected: ' + socket.id,ip);
 
     socket.setKeepAlive(true, 1000);
 
@@ -117,20 +117,19 @@ exports.deviceDisconnected = function(device_id) {
 
 exports.sendPingToAllLmsSockets = function(data, acc_high, callback) {
     let syncDataLMS = false;
-    if(data.aGpsgaadi){
+    if(config.lms && config.lms.userAllowedForLiveFeedForAll){
+        syncDataLMS = true;
+    }else if(data.aGpsgaadi){
         for(let g=0;g<data.aGpsgaadi.length;g++){
             let uid = data.aGpsgaadi[g].user_id;
-           //if(uid == 'NAVKAR' || uid == 'SONU' || uid == 'MIDDLEMILE' || uid == 'SUMITROADLINE' || uid == 'STC' || uid == 'VL'){
-           if(uid == 'NAVKAR' || uid == 'DGFC2' || uid == 'DGFC' || uid == 'DGRC' || uid == 'castrol_dgfc' || uid == 'SHELL'
-               || uid == 'KISSAN' || uid == 'kamal' || uid == 'SONU' || uid == 'MIDDLEMILE' || uid == 'SUMITROADLINE'
-               || uid == 'STC' || uid == 'VL'||  uid == 'annu@ispat' ||  uid == 'WCPL' ||  uid == 'churi' || uid == 'annunict' || uid == 'SIPL'){
-                syncDataLMS = true;
+            if(config.lms && config.lms.userAllowedForLiveFeed && config.lms.userAllowedForLiveFeed.length){
+                if(config.lms.userAllowedForLiveFeed.indexOf(uid) > -1){
+                    syncDataLMS = true;
+                }
             }
         }
     }
-    //if(data.model_name == 'tk103' || data.model_name == 'ks199' || data.model_name == 'fmb190' || data.model_name == 'ais140' || data.user_id == 'DGFC'|| data.user_id == 'KISSAN' || data.user_id == 'kamal' || data.user_id == 'mayank' || data.user_id == 'praveen' || data.user_id == 'kd' || data.model_name == 'crx' || data.user_id == 'SHELL' || data.user_id == 'castrol_dgfc' ){
-    //if(data.model_name == 'tk103' || data.model_name == 'ks199'){
-    if(syncDataLMS){  
+    if(syncDataLMS){
         let response = {};
         response.status = 'OK';
         response.request = 'live_feed';
@@ -173,13 +172,14 @@ function prepareFeed(data) {
         location_time : data.location_time,
         positioning_time : data.positioning_time,
         aGpsgaadi : data.aGpsgaadi,
-        user_id: data.user_id
+        user_id: data.user_id,
+        f_lvl:data.f_lvl
     }
 };
 
 function fetchTripGeofences(device_id){
-    for (const key in serverConfig.servers) {
-        if (!serverConfig.servers.hasOwnProperty(key)) continue;
+    for (const key in config.servers) {
+        if (!config.servers.hasOwnProperty(key)) continue;
         if(servers[key] && servers[key].getActiveConnections){
             let device = servers[key].getActiveConnections(device_id);
             if(device && device.connection){
