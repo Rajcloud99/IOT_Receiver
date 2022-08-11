@@ -61,7 +61,7 @@ class Device {
 
 		this.logAll = false;
 
-		this.logOne = 357073295741991;
+		this.logOne = 868298060451672;
 
 		this.endListener = () => {
 			if(this.getUID() == this.logOne){
