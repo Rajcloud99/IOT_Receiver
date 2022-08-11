@@ -95,10 +95,12 @@ function handleData(data, socket){
 
 function sendMessage(socket, type, message){
     if (socket.destroyed) {
+        console.log(' socket is destroyed ');
         return;
     }
     message = {type: type, msg: message};
     socket.write(Buffer.from(JSON.stringify(message)+'\n'));
+    console.log(' data sent to server');
 }
 
 exports.deviceConnected = function(device_id) {
