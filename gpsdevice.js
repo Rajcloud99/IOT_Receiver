@@ -382,14 +382,16 @@ class Device {
                                 lmsPingInt = lmsPingInt/60000;
                             }
 							let condC1 = !(this.latestLocation && this.latestLocation.pingToLMS);
-                            if(this.latestLocation && ( condC1 || lmsPingInt > 10)){//min
-								console.log(' sendping to all server',gps_data.imei);
+                           // if(this.latestLocation && ( condC1 || lmsPingInt > 10)){//min
+								console.log(' send ping to all server',gps_data.imei);
                                 gps_data.user_id = this.user_id;
                                 gps_data.model_name = this.model_name;
-								this.latestLocation.pingToLMS = new Date();
+								if(this.latestLocation){
+									this.latestLocation.pingToLMS = new Date();
+								}
 								gps_data.aGpsgaadi = this.aGpsgaadi;
                                 lmsSocketServer.sendPingToAllLmsSockets(JSON.parse(JSON.stringify(gps_data)), this.acc_high, cb);
-                            }
+                           // }
                         }),
                         async.reflect(cb => {
                             this.checkForAlarmSettings(JSON.parse(JSON.stringify(gps_data)), cb);
