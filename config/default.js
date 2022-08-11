@@ -3,7 +3,7 @@ const dbConf = require('../utils/dbConf');
 module.exports = {
     "host":"IP",
     "database": {
-        nodes: dbConf.isDBLocal ? ['localhost'] : ["ip1,ip2"],
+        nodes: dbConf.isDBLocal ? ['localhost'] : ["localhost"],
         fcmEnabled: !dbConf.isDBLocal,
         http_port:5006,
 	    smsEnabled: !dbConf.isDBLocal,
