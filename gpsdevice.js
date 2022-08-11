@@ -617,10 +617,6 @@ class Device {
 		*/
 		cassandra.insertGPSData(getCopy(gps_data));
 
-        if(this.aGpsgaadi && this.aGpsgaadi.length && gps_data.lat && prepareAPIdata){
-			prepareAPIdata(this.aGpsgaadi,gps_data);
-		}
-
 		if (gps_data.datetime < this.lastLocationTime) { //Ignore old data as it will break our reports TODO = check
 			//console.log('old data ',this.getUID(),new Date(gps_data.datetime));
 			if (this.logAll || this.getUID() === this.logOne) winston.error('old data ' + this.getUID() , new Date(gps_data.datetime).toLocaleString(), '<', new Date(this.lastLocationTime).toLocaleString());
