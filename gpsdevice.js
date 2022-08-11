@@ -364,7 +364,7 @@ class Device {
                     callback(error);
 				}else{
                    // if (this.logAll || this.getUID() === this.logOne) winston.error(gps_data.lat,gps_data.lng);
-                    callback();
+                   // callback();
 					if(this.getUID() === this.logOne){
 						console.log('f_lvl,m_fact,fl at handlePing',gps_data.f_lvl,this.fuel_sensor_m_fact,gps_data.fl);
 					}
@@ -397,11 +397,15 @@ class Device {
                             this.checkForAlarmSettings(JSON.parse(JSON.stringify(gps_data)), cb);
                         })
                     ], (err, res) => {
+						if(err){
+							console.log('errr in process ping data sync',err.message);
+						}
+						callback();
                     });
 				}
 			}).catch(err => {
 				if(err!='old data') {
-					//console.error('on processPingDataAsync '+gps_data.device_id ,err);
+					console.error('on processPingDataAsync errorss'+gps_data.device_id ,err);
 				}
 				callback(err);
 			});
