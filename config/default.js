@@ -512,7 +512,7 @@ module.exports = {
     },
     "lms":{
         lmsService:true,
-        host:"3.110.92.242",
+        host:"13.235.119.20",
         port:"3002",
         userAllowedForLiveFeedForAll:true,
         userAllowedForTripForAll:true,
