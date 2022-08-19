@@ -119,7 +119,7 @@ exports.deviceDisconnected = function(device_id) {
 
 exports.sendPingToAllLmsSockets = function(data, acc_high, callback) {
     let syncDataLMS = false;
-    console.log('ping from ',data.imei);
+
     if(config.lms && config.lms.userAllowedForLiveFeedForAll){
         syncDataLMS = true;
     }else if(data.aGpsgaadi){
@@ -140,6 +140,7 @@ exports.sendPingToAllLmsSockets = function(data, acc_high, callback) {
         setStatus(data);
         response.data = prepareFeed(data);
         for (let key in sockets) {
+            console.log(' sendMessage ping from ',data.imei);
             sendMessage(sockets[key], 'message', response);
         }
     }
