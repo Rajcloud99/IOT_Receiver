@@ -518,5 +518,6 @@ module.exports = {
         userAllowedForTripForAll:true,
         server_intercommunication_key:"eyJrZXkiOiJncHNnYWFkaSIsInRpbWUiOjE1MjIwMTA0OTgxNjJ9.0kD2fPtK2cybSL1rU51_azToU_SEr_TcNXPOzKgUxyA"
     },
-    "notification":{}
+    "notification":{},
+    "geographyUrl":"http://13.235.119.20:4242/"
 };
