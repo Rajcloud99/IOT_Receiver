@@ -4,7 +4,7 @@
 */
 
 const request = require('request');
-
+const config = require('../config');
 exports.getAddressAsync = (lat, lng) => {
     return new Promise((resolve, reject) => {
         exports.getAddressFromAWS(lat, lng, (err, res) => {
@@ -16,7 +16,6 @@ exports.getAddressAsync = (lat, lng) => {
 
 exports.getAddress = function(lat, lng, callback) {
     if(process.env.NODE_ENV === 'servertest') return callback(null, null);
-    // var url = "http://52.220.18.209/reverse?format=json&lat=" + lat + "&lon=" + lng + "&zoom=18&addressdetails=0";
     const url = "https://maps.googleapis.com/maps/api/geocode/json?latlng="+lat+","+lng+"&key=AIzaSyBE4mbCTpBNN4ynHx3tzAP5wJgz_lN3pXA";
     //const url = "https://maps.googleapis.com/maps/api/geocode/json?latlng="+lat+","+lng;
 
@@ -51,8 +50,7 @@ exports.getAddressFromAWSAsync = (lat, lng) => {
 
 exports.getAddressFromAWS  = function (lat, lng, callback) {
 	if(process.env.NODE_ENV === 'servertest') return callback(null, null);
-    //const url = "http://52.220.18.209/reverse?format=json&lat=" + lat + "&lon=" + lng + "&zoom=18&addressdetails=0";
-    const url = "http://13.229.178.235:4242/reverse?lat=" + lat + "&lon=" + lng;
+    const url = config.geographyUrl + "reverse?lat=" + lat + "&lon=" + lng;
     request(url, {
         timeout: 5000
     }, function(error, response, body) {
@@ -92,9 +90,7 @@ exports.getAddressFromGeographyV2Async = (oSettings) => {
 
 exports.getAddressFromGeographyV2  = function (oSettings, callback) {
     if(process.env.NODE_ENV === 'servertest') return callback(null, null);
-    //const url = "http://52.220.18.209/reverse?format=json&lat=" + lat + "&lon=" + lng + "&zoom=18&addressdetails=0";
-    const url = "http://13.229.178.235:4242/reverse/short?lat=" + oSettings.lat + "&lon=" + oSettings.lng + "&imei=" +oSettings.imei ;
-   // const url = "http://13.229.178.235:4242/reverse?lat=" + lat + "&lon=" + lng;
+    const url = config.geographyUrl + "reverse/short?lat=" + oSettings.lat + "&lon=" + oSettings.lng + "&imei=" +oSettings.imei ;
 
     request(url, {
         timeout: 3000
@@ -117,9 +113,7 @@ exports.getAddressFromGeographyV2  = function (oSettings, callback) {
 
 exports.getAddressFromGeography  = function (lat, lng, callback) {
     if(process.env.NODE_ENV === 'servertest') return callback(null, null);
-    //const url = "http://52.220.18.209/reverse?format=json&lat=" + lat + "&lon=" + lng + "&zoom=18&addressdetails=0";
-    const url = "http://13.229.178.235:4242/reverse/short?lat=" + lat + "&lon=" + lng;
-   // const url = "http://13.229.178.235:4242/reverse?lat=" + lat + "&lon=" + lng;
+    const url = config.geographyUrl + "reverse/short?lat=" + lat + "&lon=" + lng;
 
     request(url, {
         timeout: 3000
@@ -151,7 +145,7 @@ exports.getBeatFromGeographyAsync = (query) => {
 
 exports.getBeatFromGeography = function (query, callback) {
     if (process.env.NODE_ENV === 'servertest') return callback(null, null);
-    const url = "http://13.229.178.235:4242/beat/get";
+    const url = config.geographyUrl + "beat/get";
 
     var options = {
         method: 'POST',
@@ -218,8 +212,7 @@ exports.getLandmarkFromGeographyAsync = (query) => {
 };
 exports.getLandmarkFromGeography = function (query, callback) {
     if (process.env.NODE_ENV === 'servertest') return callback(null, null);
-    //const url = "http://localhost:4242/landmark/get";
-    const url = "http://13.229.178.235:4242/landmark/get";
+    const url = config.geographyUrl + "landmark/get";
     var options = {
         method: 'POST',
         url: url,
@@ -247,8 +240,7 @@ exports.getLandmarkFromGeography = function (query, callback) {
 
 exports.addAlerts = function (query, callback) {
     if (process.env.NODE_ENV === 'servertest') return callback(null, null);
-    //const url = "http://localhost:4242/alert/add";
-    const url = "http://13.229.178.235:4242/alert/add";
+    const url = config.geographyUrl + "alert/add";
     var options = {
         method: 'POST',
         url: url,
@@ -275,8 +267,7 @@ exports.addAlerts = function (query, callback) {
 
 exports.upsertAlerts = function (query, callback) {
     if (process.env.NODE_ENV === 'servertest') return callback(null, null);
-    //const url = "http://localhost:4242/alert/add";
-    const url = "http://13.229.178.235:4242/alert/upsert";
+    const url = config.geographyUrl + "alert/upsert";
     var options = {
         method: 'POST',
         url: url,
@@ -303,8 +294,7 @@ exports.upsertAlerts = function (query, callback) {
 
 exports.getAlerts = function (query, callback) {
     if (process.env.NODE_ENV === 'servertest') return callback(null, null);
-    //const url = "http://localhost:4242/alert/add";
-    const url = "http://13.229.178.235:4242/alert/get";
+    const url = config.geographyUrl + "alert/get";
     var options = {
         method: 'POST',
         url: url,

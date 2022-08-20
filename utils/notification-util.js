@@ -48,10 +48,10 @@ exports.sendFCMNotification = function (oNotification, callback) {
  "priority" : "low",
  "severity": "warning"
  },
- "registration_ids" : ["cOOB6VhnT0uiVmYAsN91wj:APA91bHdeX_RxgNeEJgavtFgoXW2SrOUYz53EG6Ehv-DmXomNmTwNmglEGYFmhuF3D3IlN4zWcd6NUM_9Wk0ltnK92Uof0e_YEqLtodYLLbj9VFR3zoiFYig-7bjM8rVj-SZfQ1mR9oX"]
+ "registration_ids" : ["eSXbpnMKG5I:APA91bF_WYXKlMZk_oP1bR1aAbvP1O1uDf8SWc6PVbGxTLRt7ZKAQZdTfM7K_eDrBfrAV1IVZQZvqExak3NClA7rth3omOQv2r6sanUv1rdmb9pAKzLTXHq-2556-O-KpcvVPGL97Bgk"]
  };
  exports.sendFCMNotification(oFCMNotif,function(err,resp){
 	 console.log(err,resp);
  });
- */
+*/
  

@@ -1,4 +1,5 @@
 const request = require('request');
+const config = require('../config');
 
 function cbTest(err,resp){
     console.log('getSensorAsync cbTest ',err,resp);
@@ -17,7 +18,7 @@ exports.getSensor = function (query, callback) {
     if (!query) return callback(null, '');
     query.projection = {"device":1,m_fact:1};
     if (process.env.NODE_ENV === 'servertest') return callback(null, null);
-    const url = "http://13.229.178.235:4242/sensor/get";
+    const url = config.geographyUrl + "sensor/get";
     let options = {
         method: 'POST',
         url: url,
