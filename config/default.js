@@ -511,6 +511,7 @@ module.exports = {
         }
     },
     "lms":{
+        syncForAll:true,
         lmsService:true,
         host:"13.235.119.20",
         port:"3002",

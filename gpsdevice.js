@@ -7,7 +7,6 @@ const cassandra = require('./utils/cassandra');
 const externalip = require('./config').externalip;
 const socketServer = require('./servers/socketserver');
 const addressService = require('./services/addressService');
-const sensorService = require('./services/sensorService');
 const async = require('async');
 const dbUtils = require('./utils/dbUtils');
 const database = require('./config').database;
@@ -25,7 +24,7 @@ const lmsDbService = require('./services/lmsDbService');
 const emailService = require('./services/emailService');
 const PointInPolygon = require('./utils/pointInsidePolygoan');
 const setDistToCurrent = require('./scripts/setDistToCurrent');
-
+const oneSignalNotification = require('./utils/onseSignalNotification');
 /*************************************************************
 
  THE DEVICE CLASS
@@ -61,7 +60,7 @@ class Device {
 
 		this.logAll = false;
 
-		this.logOne = 868298060451672;
+		this.logOne = 357073295741991;
 
 		this.endListener = () => {
 			if(this.getUID() == this.logOne){
@@ -364,7 +363,7 @@ class Device {
                     callback(error);
 				}else{
                    // if (this.logAll || this.getUID() === this.logOne) winston.error(gps_data.lat,gps_data.lng);
-                   // callback();
+                    callback();
 					if(this.getUID() === this.logOne){
 						console.log('f_lvl,m_fact,fl at handlePing',gps_data.f_lvl,this.fuel_sensor_m_fact,gps_data.fl);
 					}
@@ -382,30 +381,34 @@ class Device {
                                 lmsPingInt = lmsPingInt/60000;
                             }
 							let condC1 = !(this.latestLocation && this.latestLocation.pingToLMS);
-                           // if(this.latestLocation && ( condC1 || lmsPingInt > 10)){//min
-								console.log(' send ping to all server',gps_data.imei);
-                                gps_data.user_id = this.user_id;
-                                gps_data.model_name = this.model_name;
+							gps_data.user_id = this.user_id;
+							gps_data.model_name = this.model_name;
+							gps_data.aGpsgaadi = this.aGpsgaadi;
+							if(config.lms && config.lms.syncForAll){
 								if(this.latestLocation){
 									this.latestLocation.pingToLMS = new Date();
 								}
-								gps_data.aGpsgaadi = this.aGpsgaadi;
-                                lmsSocketServer.sendPingToAllLmsSockets(JSON.parse(JSON.stringify(gps_data)), this.acc_high, cb);
-                           // }
+								lmsSocketServer.sendPingToAllLmsSockets(JSON.parse(JSON.stringify(gps_data)), this.acc_high, cb);
+							}else if(this.latestLocation && ( condC1 || lmsPingInt > 5)){//min
+								if(this.latestLocation){
+									this.latestLocation.pingToLMS = new Date();
+								}
+								lmsSocketServer.sendPingToAllLmsSockets(JSON.parse(JSON.stringify(gps_data)), this.acc_high, cb);
+							}
                         }),
                         async.reflect(cb => {
                             this.checkForAlarmSettings(JSON.parse(JSON.stringify(gps_data)), cb);
                         })
                     ], (err, res) => {
 						if(err){
-							console.log('errr in process ping data sync',err.message);
+							console.log('error in process ping data sync',err.message);
 						}
 						callback();
                     });
 				}
 			}).catch(err => {
 				if(err!='old data') {
-					console.error('on processPingDataAsync errorss'+gps_data.device_id ,err);
+					//console.error('on processPingDataAsync '+gps_data.device_id ,err);
 				}
 				callback(err);
 			});
@@ -616,6 +619,10 @@ class Device {
 		}
 		*/
 		cassandra.insertGPSData(getCopy(gps_data));
+
+        if(this.aGpsgaadi && this.aGpsgaadi.length && gps_data.lat && prepareAPIdata){
+			prepareAPIdata(this.aGpsgaadi,gps_data);
+		}
 
 		if (gps_data.datetime < this.lastLocationTime) { //Ignore old data as it will break our reports TODO = check
 			//console.log('old data ',this.getUID(),new Date(gps_data.datetime));
@@ -1871,7 +1878,7 @@ class Device {
 			}
 		}
 
-        if(bUserCond && this.model_name === 'atlanta_e101'){
+        if(bUserCond){
 	        lmsDbService.getGeofencesAsync(this.getUID())
                 .then(geofence_points => {
                     if (!geofence_points) throw new Error('no geofence_points');
@@ -2171,9 +2178,21 @@ class Device {
 					});
 				} else if (!oAlarm.trip_id && !oAlarm.milestone) { */
                 alarmService.generateMessage(oAlarm, oAlarm.entered);
+			   let oNotif = {
+				   "include_external_user_ids": [this.user_id],
+				   "contents": {
+					   "en": oAlarm.message
+				   },
+				   "data": {
+					   reg_no: this.reg_no,
+					   user_id: this.user_id,
+				   },
+				   "name": "Geofence Alert"
+			   };
+			   oneSignalNotification.sendOneSignalNotification(oNotif);
 				if(this.getUID() == this.logOne){
 					console.log('oAlarm.entered ',this.reg_no,oAlarm.name,oAlarm.entered,oAlarm.notif_id);
-		          }
+				}
                 if (oAlarm.entered) {
 					if(this.getUID() == this.logOne){
 						console.log('oAlarm.entered ',this.reg_no,oAlarm.name,oAlarm.entered);
@@ -2305,6 +2324,18 @@ class Device {
 						tbs.sendMessage('upsertAlerts error findEligibleLmsGeozones ', err.toString());
 						console.error('upsertAlerts error', err);
 					}
+					let oNotif = {
+						"include_external_user_ids": [that.user_id],
+						"contents": {
+							"en": alarm.msg
+						},
+						"data": {
+							reg_no: that.reg_no,
+							user_id: that.user_id,
+						},
+						"name": "Geofence Alert"
+					};
+					oneSignalNotification.sendOneSignalNotification(oNotif);
 				});
 				//end save alert
                 /*
@@ -2390,6 +2421,7 @@ class Device {
     }
 
 	findEligibleOverSpeeds(data) {
+		let that = this;
 		const oPing = {
 			lat: data.lat,
 			lng: data.lng,
@@ -2406,13 +2438,46 @@ class Device {
 			oAlarm.datetime = data.datetime;
 			if (this.alertSettings.over_speed[i].over_speed <= data.speed) {
 				oAlarm.message = oAlarm.vehicle_no + " is exceeded speed limit of " + oAlarm.over_speed + " KM/H with current speed of " + data.speed + " KM/H";
-				if (parseInt(Date.now() - this.lastOverspeed) >= 3600000 && data.speed > 70) { //last over speed time should be more than 1 Hr.
+				if (parseInt(Date.now() - this.lastOverspeed) >= 3600000 && data.speed > 50) { //last over speed time should be more than 1 Hr.
 					oAlarm.sendSMS = true;
 					this.lastOverspeed = Date.now();
 					notification = alarmService.prepareSendFCMandSaveNotification(oAlarm, oPing, (err, res) => {
 						if (err) winston.error('geo alarm err:' + err);
 					});
 					socketServer.sendAlertToAllSockets(JSON.parse(JSON.stringify(notification)), this.getUID());
+					const alarm = {
+						code:'over_speed',
+						imei: data.device_id || this.getUID(),
+						reg_no: that.reg_no,
+						user_id: that.user_id,
+						datetime: new Date(data.datetime),
+						model_name: that.model_name,
+						location: {
+							lat: data.lat || that.latestLocation.lat,
+							lng: data.lng || that.latestLocation.lng,
+							address:  that.address || that.latestLocation.address,
+							speed: data.speed || this.latestLocation.speed,
+							course: data.course || this.latestLocation.course
+						}
+					};
+					addressService.upsertAlerts(alarm, (err, resp) => {
+						if (err) {
+							tbs.sendMessage('upsertAlerts error findEligibleOverSpeeds ', err.toString());
+							console.error('upsertAlerts error', err);
+						}
+						let oNotif = {
+							"include_external_user_ids": [that.user_id],
+							"contents": {
+								"en": oAlarm.msg
+							},
+							"data": {
+								reg_no: that.reg_no,
+								user_id: that.user_id,
+							},
+							"name": "Overspeed Alert"
+						};
+						oneSignalNotification.sendOneSignalNotification(oNotif);
+					});
 				}
 			}
 		}
@@ -2468,6 +2533,18 @@ class Device {
 				});
 				if (notification) {
 					socketServer.sendAlertToAllSockets(JSON.parse(JSON.stringify(notification)), this.getUID());
+					let oNotif = {
+						"include_external_user_ids": [this.user_id],
+						"contents": {
+							"en": haltAlert.message
+						},
+						"data": {
+							reg_no: this.reg_no,
+							user_id: this.user_id,
+						},
+						"name": "Halt Alert"
+					};
+					oneSignalNotification.sendOneSignalNotification(oNotif);
 				}
 				haltAlert.last_location_time = this.latestLocation.location_time;
 				haltAlert.last_received_time = Date.now();

@@ -38,5 +38,8 @@ require('./utils/externalip').getIpAsync().then(function(ip){
 }).then(() => {
     return Promise.resolve();
 }).then(() => {
-    require('./utils/initiate.js');
+	global.prepareAPIdata  = function (aGpsgaadi,gps_data){
+	//define method
+	};
+	require('./utils/initiate.js');
 });
