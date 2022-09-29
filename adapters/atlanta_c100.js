@@ -77,7 +77,7 @@ class adapter{
                 ns: str[5],
                 lng: this.convertToDecimal(str[6]),
                 ew:str[7],
-                speed: parseInt(str[8]),
+                speed: 1.852 * parseInt(str[8]), //speed in knots
                 gps_tracking : true,
                 course: parseFloat(str[9]),
                 ignition:oInputStatus.ignition,

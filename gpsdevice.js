@@ -831,8 +831,9 @@ class Device {
 			alarm.extra = extra;
 			alarm.msg += (' : ' + extra);
 		}
-		//TODO fix locations
-		if (false && oGPSData && oGPSData.location && oGPSData.location.datetime) {
+
+		//TODO fix locations it should be fetched for that time
+		if (oGPSData && oGPSData.location && oGPSData.location.datetime) {
 			alarm.location = oGPSData.location;
 		}else if (this.latestLocation) {
 			//TODO fetch location of alarm while it was happened for history packet
@@ -863,6 +864,9 @@ class Device {
 		}, () => {
 		}, () => {
 		});
+		if(!alarm.location){
+			return;
+		}
 		if (alarm_code == 'ha' || alarm_code == 'hb') {
 			console.log('oGPSData.location.datetime',oGPSData.location.datetime);
 			//  let vAc = this.validateAcceleration(alarm, function (err, valid) {});
@@ -889,6 +893,18 @@ class Device {
 									tbs.sendMessage('upsertAlerts error', err.toString());
 									console.error('upsertAlerts error', err);
 								}
+								let oNotif = {
+									"include_external_user_ids": [alarm.user_id],
+									"contents": {
+										"en": alarm.msg
+									},
+									"data": {
+										reg_no: alarm.reg_no,
+										user_id: alarm.user_id,
+									},
+									"name": alarm.code
+								};
+								oneSignalNotification.sendOneSignalNotification(oNotif);
 							});
 						}
 					}).catch(function (err) {
@@ -902,6 +918,18 @@ class Device {
 					tbs.sendMessage('upsertAlerts error', err.toString());
 					console.error('upsertAlerts error', err);
 				}
+				let oNotif = {
+					"include_external_user_ids": [alarm.user_id],
+					"contents": {
+						"en": alarm.msg
+					},
+					"data": {
+						reg_no: alarm.reg_no,
+						user_id: alarm.user_id,
+					},
+					"name": alarm.code
+				};
+				oneSignalNotification.sendOneSignalNotification(oNotif);
 			});
 			alarmService.sendAlerts(alarm);
 			if(config.lms && config.lms.userAllowedForTripForAll){
@@ -1883,7 +1911,7 @@ class Device {
                 .then(geofence_points => {
                     if (!geofence_points) throw new Error('no geofence_points');
 					that.tripAlertSettings = [];
-					console.log('geofence_points found for trip alarm',this.user_id,this.getUID(),geofence_points.length);
+					//console.log('geofence_points found for trip alarm',this.user_id,this.getUID(),geofence_points.length);
                     for (let i = 0; i < geofence_points.length; i++) {
                         if (!geofence_points[i].geozone) continue;
                         geofence_points[i].ptype = 'circle';
@@ -1916,6 +1944,9 @@ class Device {
         if (this.latestLocation && this.alertSettings && this.alertSettings.over_speed) {
             this.findEligibleOverSpeeds(data);
         }
+		if (config.enableHaltAlert && this.latestLocation && this.alertSettings && this.alertSettings.halt) {
+			this.findEligibleHalts();
+		}
         if (callback) callback();
     }
 
@@ -2515,7 +2546,7 @@ class Device {
             device_halt_dur = Date.now() - new Date(this.latestLocation.location_time).getTime();
             device_halt_dur = device_halt_dur / 60000; // in minutes
         }
-
+        let that = this;
 		if (!this.alertSettings || !this.alertSettings.halt) return;
 
 		for (let i = 0; i < this.alertSettings.halt.length; i++) {
@@ -2525,7 +2556,7 @@ class Device {
 
 			this.isHaltEventAsync(device_halt_dur, haltAlert).then(() => {
 				haltAlert.message = "vehicle " + haltAlert.vehicle_no + "  was stopped from last " + dateUtils.getDurationFromSecs(device_halt_dur * 60);
-				// tbs.sendMessage('got halt', haltAlert.message);
+				/*
 				const notification = alarmService.prepareSendFCMandSaveNotification(haltAlert, this.latestLocation, (err, respp) => {
 					if (err) {
 						winston.error('error while saving notification', err);
@@ -2533,19 +2564,49 @@ class Device {
 				});
 				if (notification) {
 					socketServer.sendAlertToAllSockets(JSON.parse(JSON.stringify(notification)), this.getUID());
-					let oNotif = {
-						"include_external_user_ids": [this.user_id],
-						"contents": {
-							"en": haltAlert.message
-						},
-						"data": {
-							reg_no: this.reg_no,
-							user_id: this.user_id,
-						},
-						"name": "Halt Alert"
-					};
-					oneSignalNotification.sendOneSignalNotification(oNotif);
 				}
+				*/
+				//one signal starts
+				console.log(haltAlert.message);
+				let alarm = {
+					imei: haltAlert.imei || that.getUID(),
+					reg_no: that.reg_no,
+					user_id: that.user_id,
+					code: 'halt',
+					msg: haltAlert.message,
+					datetime: Date.now(),
+					driver: that.driver || that.driver_name || that.driver_name2,
+					model_name: that.model_name
+				};
+				if (that.latestLocation) {
+					alarm.location = {
+						lat: that.latestLocation.lat,
+						lng: that.latestLocation.lng,
+						datetime: that.latestLocation.datetime,
+						address: that.latestLocation.address,
+						speed: that.latestLocation.speed,
+						course: that.latestLocation.course
+					};
+					addressService.upsertAlerts(alarm, (err, resp) => {
+						if (err) {
+							tbs.sendMessage('upsertAlerts error', err.toString());
+							console.error('upsertAlerts error', err);
+						}
+						let oNotif = {
+							"include_external_user_ids": [this.user_id],
+							"contents": {
+								"en": haltAlert.message
+							},
+							"data": {
+								reg_no: that.reg_no,
+								user_id: that.user_id,
+							},
+							"name": "Halt Alert"
+						};
+						oneSignalNotification.sendOneSignalNotification(oNotif);
+					});
+				}
+				//one signal ends
 				haltAlert.last_location_time = this.latestLocation.location_time;
 				haltAlert.last_received_time = Date.now();
 				const oUpdate = {
@@ -2560,7 +2621,7 @@ class Device {
 					}
 				});
 			}).catch(err => {
-				// tbs.sendMessage('findEligibleHalts err', err.stack);
+					//console.error('findEligibleHalts error',err);
 			});
 		}
 	}
