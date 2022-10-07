@@ -140,7 +140,6 @@ exports.sendPingToAllLmsSockets = function(data, acc_high, callback) {
         setStatus(data);
         response.data = prepareFeed(data);
         for (let key in sockets) {
-            console.log(' sendMessage ping from ',data.imei);
             sendMessage(sockets[key], 'message', response);
         }
     }
