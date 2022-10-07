@@ -461,6 +461,9 @@ class Device {
 			'address','odo','dist_today','user_id','driver_name','driver_name2','rfid1','rfid2','driver','acc_high','acc_high_time','power_supply','power_supply_time','sens_fl','f_lvl'], {imei: this.getUID()})
 			.then(device => {
 				device = device[0];
+				if(!device || !device.positioning_time){
+					console.error('initiateLatestLocationIfStopped positioning not detected',device);
+				}
 
 				if ((Date.now() - new Date(device.positioning_time).getTime()) < 10 * 60 * 1000) {
 					this.address = device.address;

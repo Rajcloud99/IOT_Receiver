@@ -100,7 +100,7 @@ function sendMessage(socket, type, message){
     }
     message = {type: type, msg: message};
     socket.write(Buffer.from(JSON.stringify(message)+'\n'));
-    console.log(' data sent to server');
+    //console.log(' data sent to server');
 }
 
 exports.deviceConnected = function(device_id) {
