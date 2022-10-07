@@ -95,7 +95,7 @@ function handleData(data, socket){
 
 function sendMessage(socket, type, message){
     if (socket.destroyed) {
-        console.log(' socket is destroyed ');
+        //console.log(' socket is destroyed ');
         return;
     }
     message = {type: type, msg: message};
