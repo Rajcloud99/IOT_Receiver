@@ -32,7 +32,7 @@ class adapter{
      *******************************************/
     parse_data(data)  {
         //data = converter.byteArrayToHexString(data);
-        //fs.appendFile('fmb920.txt', new Date() + ' : '+ data.toString('hex')+'\n', function (err) {});
+        fs.appendFile('fmb920.txt', new Date() + ' : '+ data.toString('hex')+'\n', function (err) {});
         var data=new Buffer(data,'hex');
         //TODO can use logone
         var buf;
