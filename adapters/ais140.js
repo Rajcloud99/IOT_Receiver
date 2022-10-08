@@ -192,7 +192,7 @@ class adapter{
             }
         }
         if((this.device.getUID() == 862549047304947) ||   (this.device.getUID() == 862549047304525)){
-            console.log('SB',data.sb,data.intr1,this.device.getUID());
+           // console.log('SB',data.sb,data.intr1,this.device.getUID());
          }
 
         //data.original = msg_parts.original;

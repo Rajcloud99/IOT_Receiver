@@ -95,7 +95,7 @@ class adapter{
             //data.lat = data.ns === 'N' ? data.lat : -1 * data.lat;
             //data.lng = data.ew === 'E' ? data.lng : -1 * data.lng;
             if(!str[10]){
-                console.error('str[10] atlanta',str);
+               // console.error('str[10] atlanta',str);
                 return ;
             }
             let dateStr = str[10].toString();
@@ -160,7 +160,7 @@ class adapter{
     getInputDeatils(strAlert){
         let oAlert= {};
         if(!strAlert || strAlert.length < 12){
-            console.log('wrong alerts string',strAlert);
+           // console.log('wrong alerts string',strAlert);
             return oAlert;
         }
         oAlert.ignition = strAlert.substr(1,1);
