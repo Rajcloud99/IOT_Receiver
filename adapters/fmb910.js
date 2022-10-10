@@ -190,7 +190,7 @@ class adapter{
                                 //Add output status
 
                                 switch (id) {
-                                    case 1:
+                                    case 239:
                                     {
                                         var value = converter.bytesToInt(buf, i, 1);
                                         position.ignition = value == 1 ? 1 : 0;

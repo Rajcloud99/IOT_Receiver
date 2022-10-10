@@ -60,7 +60,7 @@ class Device {
 
 		this.logAll = false;
 
-		this.logOne = 350424069231486;
+		this.logOne = 357073295741991;
 
 		this.endListener = () => {
 			if(this.getUID() == this.logOne){
@@ -389,7 +389,7 @@ class Device {
 									this.latestLocation.pingToLMS = new Date();
 								}
 								lmsSocketServer.sendPingToAllLmsSockets(JSON.parse(JSON.stringify(gps_data)), this.acc_high, cb);
-							}else if(this.latestLocation && ( condC1 || lmsPingInt > 5)){//min
+							}else if(this.latestLocation && ( condC1 || lmsPingInt > 10)){//min
 								if(this.latestLocation){
 									this.latestLocation.pingToLMS = new Date();
 								}
@@ -461,9 +461,6 @@ class Device {
 			'address','odo','dist_today','user_id','driver_name','driver_name2','rfid1','rfid2','driver','acc_high','acc_high_time','power_supply','power_supply_time','sens_fl','f_lvl'], {imei: this.getUID()})
 			.then(device => {
 				device = device[0];
-				if(!device || !device.positioning_time){
-					console.error('initiateLatestLocationIfStopped positioning not detected',device);
-				}
 
 				if ((Date.now() - new Date(device.positioning_time).getTime()) < 10 * 60 * 1000) {
 					this.address = device.address;
@@ -528,7 +525,7 @@ class Device {
 						this.latestLocation.datetime = new Date(device.positioning_time).getTime();
 						this.latestLocation.imei = this.getUID();
 						this.lastLocationTime = this.latestLocation.datetime;
-					}else if(dist < 1300000){ //ignore if device was offline for more than 1000 KM
+					}else if(dist < 1300000){ //ignore if device was offline for more than 13000 KM
 						//TODO calculate offline dist from map my india
 						this.dist_today = this.dist_today + dist;
 					}

@@ -152,7 +152,7 @@ class adapter{
                                 //Add output status
 
                                 switch (id) {
-                                    case 1:
+                                    case 239:
                                     {
                                         var value = converter.bytesToInt(buf, i, 1);
                                         position.ignition = value == 1 ? 1 : 0;
@@ -546,7 +546,7 @@ class adapter{
                                             }
                                             if (this.device.getUID() == this.device.logOne && value == 1) {
                                                 console.log(this.device.logOne, 'SOS value ', position.sos);
-                                                fs.appendFile('fmb910' + this.device.logOne + '.txt', new Date() + ' SOS: ' + parts.org.toString('hex') + '\n', function (err) {
+                                                fs.appendFile('fmb920' + this.device.logOne + '.txt', new Date() + ' SOS: ' + parts.org.toString('hex') + '\n', function (err) {
                                                 });
                                             }
                                             i++;
@@ -935,6 +935,7 @@ class adapter{
     parse_get_location(data) {
         return this.get_ping_data({data: data});
     }
+
     get_ping_data(msg_parts) {
         return msg_parts.data;
     }
