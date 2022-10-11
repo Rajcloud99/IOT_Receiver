@@ -218,9 +218,9 @@ class Device {
 			async.eachSeries(aGPSData, function(datum, cb){
 				msg_parts.data = datum;
 				if (that.getUID() == that.logOne) {
-                     console.log('msg_parts.data.f_lvl',msg_parts.data.fl,msg_parts.data.f_lvl);
+                     console.log('multiple msg_parts.data.f_lvl',msg_parts.data.fl,msg_parts.data.f_lvl);
 				}
-				that.make_action(msg_parts.action, msg_parts);
+				that.make_action(msg_parts.action, getCopy(msg_parts));
 				cb();
 			}, function(err){
 				if(err){
