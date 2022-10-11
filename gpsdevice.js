@@ -59,8 +59,8 @@ class Device {
 		};
 
 		this.logAll = false;
-
-		this.logOne = 357073295741991;
+        //put imei in config to log its data
+		this.logOne = config.logOne;
 
 		this.endListener = () => {
 			if(this.getUID() == this.logOne){
