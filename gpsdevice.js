@@ -60,7 +60,11 @@ class Device {
 
 		this.logAll = false;
         //put imei in config to log its data
-		this.logOne = config.logOne;
+		if(!config.logOne) {
+			this.logOne = 869270043114122
+		}else{
+			this.logOne = config.logOne;
+		}
 
 		this.endListener = () => {
 			if(this.getUID() == this.logOne){
@@ -1281,7 +1285,7 @@ class Device {
 
 	processOverspeedDurationReport(data) {
 		if (!this.latestLocation) return;
-		if (data.speed > 67) {
+		if (data.speed > 67 && data.speed < 130) {
 			if (!this.latestOverspeedDuration) {
 				this.latestOverspeedDuration = {};
 				this.latestOverspeedDuration.imei = this.getUID();
@@ -1347,7 +1351,7 @@ class Device {
 		let speed_limit = (oSpeedConf && oSpeedConf.limit) || 67;
 		let speed_Dur =  (oSpeedConf && oSpeedConf.dur) || 1;
 		let eachNewInstance = oSpeedConf && oSpeedConf.eachNewInstance;
-		if (data.speed > speed_limit) {
+		if (data.speed > speed_limit && data.speed < 130) {
 			if (!this.latestOverspeedDuration) {
 				this.latestOverspeedDuration = {};
 				this.latestOverspeedDuration.imei = this.getUID();
@@ -2084,18 +2088,22 @@ class Device {
         };
         let isEvent;
         if (oAlarm.is_inside === undefined || oAlarm.is_inside === null) {
+			console.error('oAlarm.is_inside === null', oAlarm.is_inside);
             oAlarm.is_inside = is_inside;
+			oAlarm.isEvent = false;
             oAlarm.location_buffer = [];
-        } else if (is_inside !== oAlarm.is_inside) {
-        	console.log(is_inside,oAlarm.is_inside,is_inside !== oAlarm.is_inside,'1');
+        } else if (is_inside != oAlarm.is_inside) {
+        	console.log(is_inside,oAlarm.is_inside,is_inside != oAlarm.is_inside,'1');
             if (oAlarm.location_buffer.length >= reqd_loc_buffer) {
                 entry = is_inside;
                 exit = !entry;
                 oAlarm.is_inside = entry;
                 oAlarm.location_buffer = [];
                 isEvent = true;
+				oAlarm.isEvent = true;
                 geofence_status.entry = entry;
             } else {
+				oAlarm.isEvent = false;
                 oAlarm.location_buffer.push(geofence_status);
             }
         } else {
@@ -2115,7 +2123,7 @@ class Device {
 				console.log('geofence update in lms',oAlarm._id);
 				modify.request_id = oPing.datetime;
                 lmsDbService.updateTripGeofences(oAlarm._id,modify,function(err,resp){
-					console.log('updateTripGeofences resp');
+					//console.log('updateTripGeofences resp');
 					if(resp && resp.message == 'reCheckTripGeofence'){
                        that.getTripAlarms();
 					}
@@ -2316,58 +2324,57 @@ class Device {
             oAlarm.device_type = this.model_name;
             oAlarm.datetime = oPing.datetime;
             this.isGeofenceEventLmsAsync(oAlarm, oPing).then(objAlarm => {
-                console.log('in isGeofenceEventAsync ',objAlarm._id);
-				tbs.sendMessage('Trip geofence alarm ',objAlarm.name);
                 for(let i=0;i<that.tripAlertSettings.length;i++){
                     if(that.tripAlertSettings[i]._id == objAlarm._id){
-                        console.log('in isGeofenceEventAsync alarm id found ',objAlarm._id);
-						that.tripAlertSettings[i] = objAlarm;
+                        that.tripAlertSettings[i] = objAlarm;
                     }
                 }
+				//go to next iteration
+				if(done) done();
                 oAlarm = objAlarm;
                 oPing.exit = !oAlarm.entered;
-				//start save alert
-				const alarm = {
-					imei: data.device_id || this.getUID(),
-					reg_no: this.reg_no,
-					user_id: this.user_id,
-					datetime: new Date(data.datetime),
-					model_name: this.model_name,
-					location: {
-						lat: data.lat || this.latestLocation.lat,
-						lng: data.lng || this.latestLocation.lng,
-						address:oAlarm.name || this.address || this.latestLocation.address,
-						speed: data.speed || this.latestLocation.speed,
-						course: data.course || this.latestLocation.course
-					}
-				};
-				if(oAlarm.is_inside){
-					alarm.code = 'entry';
-					alarm.msg = this.reg_no + " entered into geofence " + oAlarm.name;
-				}else{
-					alarm.code = 'exit';
-					alarm.msg = this.reg_no + " exit from geofence " + oAlarm.name;
-				}
-              //go to next iteration
-				if(done) done();
-				addressService.upsertAlerts(alarm, (err, resp) => {
-					if (err) {
-						tbs.sendMessage('upsertAlerts error findEligibleLmsGeozones ', err.toString());
-						console.error('upsertAlerts error', err);
-					}
-					let oNotif = {
-						"include_external_user_ids": [that.user_id],
-						"contents": {
-							"en": alarm.msg
-						},
-						"data": {
-							reg_no: that.reg_no,
-							user_id: that.user_id,
-						},
-						"name": "Geofence Alert"
+				if(objAlarm.isEvent){
+					//start save alert
+					const alarm = {
+						imei: data.device_id || this.getUID(),
+						reg_no: this.reg_no,
+						user_id: this.user_id,
+						datetime: new Date(data.datetime),
+						model_name: this.model_name,
+						location: {
+							lat: data.lat || this.latestLocation.lat,
+							lng: data.lng || this.latestLocation.lng,
+							address:oAlarm.name || this.address || this.latestLocation.address,
+							speed: data.speed || this.latestLocation.speed,
+							course: data.course || this.latestLocation.course
+						}
 					};
-					oneSignalNotification.sendOneSignalNotification(oNotif);
-				});
+					if(oAlarm.is_inside){
+						alarm.code = 'entry';
+						alarm.msg = this.reg_no + " entered into geofence " + oAlarm.name;
+					}else{
+						alarm.code = 'exit';
+						alarm.msg = this.reg_no + " exit from geofence " + oAlarm.name;
+					}
+					addressService.upsertAlerts(alarm, (err, resp) => {
+						if (err) {
+							tbs.sendMessage('upsertAlerts error findEligibleLmsGeozones ', err.toString());
+							console.error('upsertAlerts error', err);
+						}
+						let oNotif = {
+							"include_external_user_ids": [that.user_id],
+							"contents": {
+								"en": alarm.msg
+							},
+							"data": {
+								reg_no: that.reg_no,
+								user_id: that.user_id,
+							},
+							"name": "Geofence Alert"
+						};
+						oneSignalNotification.sendOneSignalNotification(oNotif);
+					});
+				}
 				//end save alert
                 /*
                 let notification;
@@ -2469,7 +2476,7 @@ class Device {
 			oAlarm.datetime = data.datetime;
 			if (this.alertSettings.over_speed[i].over_speed <= data.speed) {
 				oAlarm.message = oAlarm.vehicle_no + " is exceeded speed limit of " + oAlarm.over_speed + " KM/H with current speed of " + data.speed + " KM/H";
-				if (parseInt(Date.now() - this.lastOverspeed) >= 3600000 && data.speed > 50) { //last over speed time should be more than 1 Hr.
+				if (parseInt(Date.now() - this.lastOverspeed) >= 3600000 && data.speed > 50 && data.speed < 130) { //last over speed time should be more than 1 Hr.
 					oAlarm.sendSMS = true;
 					this.lastOverspeed = Date.now();
 					notification = alarmService.prepareSendFCMandSaveNotification(oAlarm, oPing, (err, res) => {

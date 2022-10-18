@@ -523,7 +523,7 @@ class adapter{
                                     //Add output status
                                     //IO element’s value 1 byte
                                     switch (id) {
-                                        case 1: {
+                                        case 239: {
                                             var value = converter.bytesToInt(buf, i, 1);
                                             position.ignition = value == 1 ? 1 : 0;
                                             i++;
@@ -802,8 +802,7 @@ class adapter{
             }
         }
         if(this.device.getUID() == this.device.logOne){
-            //console.log(this.device.logOne,parts.org);
-          //  fs.appendFile('fmb920'+this.device.logOne+'.txt', new Date() + ' : '+ parts.org+'\n', function (err) {});
+            fs.appendFile('fmb920'+this.device.logOne+'.txt', new Date() + ' : '+ parts.org+'\n', function (err) {});
         }
         return parts;
     }

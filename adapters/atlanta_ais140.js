@@ -32,7 +32,6 @@ class adapter{
         data = data.toString();
         const parts = {};
         parts.org = data;
-        //fs.appendFile('atlanta_ais140.txt', new Date() + ' : '+ parts.org+'\n', function (err) {});
         //'$,CP,ASPL,V1.1.1,NR,01,L,864495039252728,DL1RQ2455,1,21082018,102209,28.359692,N,76.927437,E,0.0,36.00,8,269.0,1.2,1.7,Airtel P N,0,1,12.2,4.0,0,C,25,404,10,209,c342,6d17,209,24,d2fb,209,20,d2fc,209,19,c344,209,19,0111,0  0,002165,125.4,A,,?*'
         data = data.split(',');
         //const error_code = this.get_error_code(data.substr(0, data.length - 4));
