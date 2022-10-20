@@ -66,7 +66,7 @@ const server = net.createServer(function(socket){
         // do nothing
     });
 
-    socket.setTimeout(6 * 60 * 1000, function() {
+    socket.setTimeout(6 * 60 * 1000, function(err) {
         // This will emit events error and close, so no need to handle close separately
         socket.destroy('timeout');
         winston.error('lmssocket err on timeout', err);
