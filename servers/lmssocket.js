@@ -30,7 +30,7 @@ let deviceOfflineResponseForCommands = {
 
 const server = net.createServer(function(socket){
     if(!socket.remoteAddress) {
-        telegramBotService.sendAlert('no remoteAddress');
+        telegramBotService.sendAlert('no remoteAddress createServer');
         return;
     }
     let ip = socket.remoteAddress.split(':');
@@ -45,6 +45,7 @@ const server = net.createServer(function(socket){
     socket.alertRequestsForDevice = {};
 
     const stream = socket.pipe(split());
+
     stream.on('data', function(data) {
         // winston.info(data);
         try{
@@ -53,31 +54,35 @@ const server = net.createServer(function(socket){
         } catch(err) {}
     });
 
-    socket.on('end', function() {
+    socket.on('end', function(err) {
         // This will emit events error and close, so no need to handle close separately
         socket.destroy('device side end');
+        winston.error('lmssocket err on end',err);
     });
 
     socket.on('error', function(err) {
-        winston.error('lmssocket err', err);
+        winston.error('lmssocket err on error', err);
+        telegramBotService.sendMessage(config.externalip + ' socket client error: ' + socket.id,err);
         // do nothing
     });
 
     socket.setTimeout(6 * 60 * 1000, function() {
         // This will emit events error and close, so no need to handle close separately
         socket.destroy('timeout');
+        winston.error('lmssocket err on timeout', err);
+        telegramBotService.sendMessage(config.externalip + ' socket client timeout: ' + socket.id);
     });
 
 }).listen(port);
 
 // close will be immediately followed
 server.on('error', function(err){
-    // winston.error('socket server error', err);
-    telegramBotService.sendMessage('socket server error');
+    winston.error('socket server error', err);
+    telegramBotService.sendMessage('socket server error',err.message);
 });
 
 server.on('close', function(err){
-    // winston.error('socket server close/', err);
+    winston.error('socket server close', err);
     telegramBotService.sendMessage('socket server close');
 });
 
@@ -95,12 +100,11 @@ function handleData(data, socket){
 
 function sendMessage(socket, type, message){
     if (socket.destroyed) {
-        //console.log(' socket is destroyed ');
+        console.error('socket.destroyed on sendMessage');
         return;
     }
     message = {type: type, msg: message};
     socket.write(Buffer.from(JSON.stringify(message)+'\n'));
-    //console.log(' data sent to server');
 }
 
 exports.deviceConnected = function(device_id) {
@@ -119,7 +123,6 @@ exports.deviceDisconnected = function(device_id) {
 
 exports.sendPingToAllLmsSockets = function(data, acc_high, callback) {
     let syncDataLMS = false;
-
     if(config.lms && config.lms.userAllowedForLiveFeedForAll){
         syncDataLMS = true;
     }else if(data.aGpsgaadi){

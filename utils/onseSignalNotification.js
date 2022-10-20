@@ -22,7 +22,7 @@ exports.sendOneSignalNotification = function(oNotif,callback){
     oSigPayload.data.app_id = config.oneSignal && config.oneSignal.app_id;
     axios(oSigPayload)
         .then(function (response,rest) {
-            console.log('oData.payload sendOneSignalNotification  records');
+            //console.log('oData.payload sendOneSignalNotification  records');
             if(callback){
                 callback(null,response);
             }
