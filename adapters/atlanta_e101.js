@@ -2,10 +2,7 @@
  * Created by Kamal on 17-07-2020.
  */
 
-const socketServer = require('../servers/socketserver');
 const devices = require('../config').devices;
-const tbs = require('../services/telegramBotService');
-const winston = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
 
@@ -43,6 +40,10 @@ class adapter{
             this.device.setUID(parts.device_id);
             this.device.login_request(parts);
         }
+        if(data[3] == 'V'){
+            console.error('Invalid data ',parts.device_id,'atlanta-e101');
+            return;
+        }
         let oAlert =  this.getInputDeatils(data[14]);
         if(oAlert && oAlert.alarm){
             parts.cmd = parts.begin.substr(parts.begin.length - 2, 2) || "02";
@@ -54,14 +55,13 @@ class adapter{
             parts.packat_type = "01";
         }
         if(this.device.getUID() == this.device.logOne) {
-            fs.appendFile('atlanta_c100-'+this.device.getUID()+'.txt', new Date() + ' : ' + parts.org  + '\n', function (err) {});
+            fs.appendFile('atlanta_e101-'+this.device.getUID()+'.txt', new Date() + ' : ' + parts.org  + '\n', function (err) {});
         }
         return parts;
     }
 
     get_ping_data(msg_parts) {
         try{
-            //TODO handle bulk memory data
             const str = msg_parts.data;
             let oInputStatus =  this.getInputDeatils(str[14]);
             const data = {
@@ -80,24 +80,11 @@ class adapter{
                 mnc:str[22],
                 lac:str[24],
                 power_supply:oInputStatus.power_supply
-                //cid:str[17]
-                //satellites:parseInt(str[12]),
-                // gps_fix:str[8],
-                // altitude:parseFloat(str[16]),//altitude in mtr
-                //power_off:str[7]==0,
-                //box_open:str[8]==1,
-                //odometer: parseInt(str[10]),
             };
 
-
-            //data.original = msg_parts.original;
-
-            //data.lat = data.ns === 'N' ? data.lat : -1 * data.lat;
-            //data.lng = data.ew === 'E' ? data.lng : -1 * data.lng;
-            if(!str[10]){
-               // console.error('str[10] atlanta',str);
+             if(!str[10]){
                 return ;
-            }
+             }
             let dateStr = str[10].toString();
             let day = parseInt(dateStr.substr(0, 2));
             if(day.toString() && day.toString().length === 1){
@@ -126,7 +113,7 @@ class adapter{
             data.datetime = new Date(datetime).getTime();
             return data;
         }catch (e) {
-            console.error('get_ping_data error');
+            console.error('get_ping_data error atlantae101');
             console.error(e);
             return ;
         }
@@ -134,19 +121,11 @@ class adapter{
     }
 
     authorize(msg_parts) {
-        // var msg = msg_parts.device_id.substr(-12) + 'AP05';
-        const msg = this.getUID() + 'AP05';
-        // winston.info('authorize', msg);
-        //this.send_command(this.getCommandCustom(msg));
 
-        // This device sends location data as well on login, which can be captured here
-        // msg_parts.data = msg_parts.data.substr(15);
-        //this.device.ping(msg_parts, false);
     }
 
     convertToDecimal(strCoordinate){
         if(!strCoordinate || strCoordinate.length < 4){
-            //console.log('wrong coordinate',strCoordinate);
             return 0.0;
         }
         let strArray = strCoordinate.split('.');
@@ -185,41 +164,8 @@ class adapter{
         return oAlert;
     }
 
-    answer_alarm(alarm_type) {
-        switch (alarm_type) {
-            case "IN":
-                //console.log('engine on','SET RL:0');
-                // this.send_command('SET RL:0');
-                break;
-            case "IF":
-                //console.log('engine off','SET RL:0');
-                // this.send_command('SET RL:0');
-                break;
-            case "rfid":
-                console.log('rfid','SET RL:1');
-                //this.send_command('SET RL:1');
-                break;
-            case "EMR":
-                console.log('rfid','SET EO');
-                //this.send_command('SET EO');
-                break;
-        }
-    }
-
     run_other(cmd, msg_parts) {
-        switch (cmd) {
-            case "BR05": //Handshake
-            case "BR06": //Handshake
-                // winston.info('run_other:handshake from device: '+this.device.getUID());
-                this.device.receive_handshake(msg_parts);
-                // winston.info('returning handshake to device: '+this.device.getUID());
-                break;
-            default: // string info
-                // winston.info('run_other:string info');
-                // winston.info('got string info from device');
-                this.device.receive_string_info(msg_parts);
-                break;
-        }
+      console.error('other data in atalanta e101');
     }
 
     request_login_to_device(msg_parts) {
@@ -232,13 +178,9 @@ class adapter{
 
         this.device.ping(data.location, true);
 
-        //this.answer_alarm(msg_parts.packat_type);
-
         data.alarm_terminal = this.get_alarm_terminal(msg_parts.packat_type);
 
         data.expv = this.get_exception_value(msg_parts.packat_type);
-
-        //this.device.receive_alarm(data.alarm_terminal, true, msg_parts.rfid);
 
         return data;
     }
@@ -317,44 +259,11 @@ class adapter{
     }
 
     receive_handshake(msg_parts) {
-        const acc = {};
-        acc.device_id = this.device.getUID();
-        acc.datetime = Date.now();
-        switch (msg_parts.cmd) {
-            case 'BR05':
-                acc.acc_high = true;
-                break;
-            case 'BR06':
-                acc.acc_high = false;
-                break;
-        }
-        //this.device.updateBooleanReport('acc', acc.acc_high, acc.datetime);
-        return acc;
+        console.log('handshake packet in atlanta e101');
     }
 
     receive_string_info(msg_parts) {
-        // winston.info('tk103 string info', JSON.stringify(msg_parts));
-
-        const response = {};
-        response.status = 'OK';
-        response.request = 'commands';
-        response.device_id = this.device.getUID();
-
-        for (let i = 0; i < devices.length; i++) {
-            if (devices[i].key === this.device.model_name) {
-                for (let key in devices[i].value.sms) {
-                    if (devices[i].value.sms[key].code === msg_parts.cmd) {
-                        response.command_type = key;
-                        break;
-                    }
-                }
-                break;
-            }
-        }
-        if (response.command_type === 'location') response.data = this.get_ping_data(msg_parts);
-        response.message = msg_parts.data;
-        // winston.info('sim', JSON.stringify(response));
-        return response;
+        console.log('receive_string_info in atlanta e101');
     }
 
     parse_get_location(data) {
@@ -372,20 +281,7 @@ class adapter{
     }
 
     sendCommand(type, param) {
-        // winston.info('in sendCommand', type, param);
-        let command;
-        for (let i = 0; i < devices.length; i++) {
-            if (devices[i].key === this.device.model_name) {
-                command = devices[i].value.sms[type].sms;
-                break;
-            }
-        }
-        if (param) command = command.replace("%20", param);
-        // command = ('0' + this.device.getUID()).substr(-12) + command;
-        command = this.getUID() + command;
-
-        // winston.info('sending command', this.getCommandCustom(command));
-        this.send_command(this.getCommandCustom(command));
+        console.log('sendCommand in atlanta e101');
     }
 
     /* INTERNAL FUNCTIONS */

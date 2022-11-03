@@ -7,8 +7,7 @@ const devices = require('../config').devices;
 const tbs = require('../services/telegramBotService');
 const winston = require('../utils/logger');
 const fs = require('fs');
-//added for demo purpose only , remove demo. after it
-//const demo = require('../tests/tk103Demo');
+
 
 const path = require('path');
 

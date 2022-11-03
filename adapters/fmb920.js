@@ -1,10 +1,7 @@
 /**
  * Created by kamal on 04-08-2020.
  */
-
-const socketServer = require('../servers/socketserver');
 const devices = require('../config').devices;
-const tbs = require('../services/telegramBotService');
 const converter = require('../utils/converter');
 const fs = require('fs');
 var binutils = require('binutils64');
@@ -31,8 +28,6 @@ class adapter{
      return type: login_request, ping, etc.
      *******************************************/
     parse_data(data)  {
-        //data = converter.byteArrayToHexString(data);
-        //fs.appendFile('fmb920.txt', new Date() + ' : '+ data.toString('hex')+'\n', function (err) {});
         var data=new Buffer(data,'hex');
         //TODO can use logone
         var buf;
@@ -41,7 +36,6 @@ class adapter{
         } else {
             buf = converter.stringToBytes(data);
         }
-        // fs.appendFile('fmb910.txt', new Date() + ' : '+ data+'\n', function (err) {});
         const parts = {org:buf};
         let that = this;
         let start = converter.bytesToInt(buf, 0, 2);
@@ -51,7 +45,6 @@ class adapter{
             parts.cmd = '01';
             parts.device_id = converter.hex2bin(data.substr(4,data.length-1));
             parts.device_id = parseInt(parts.device_id);
-            //console.log('login fmb910',parts.device_id);
             parts.action = "login_request";
         }else{
             let gps = [];
@@ -210,7 +203,6 @@ class adapter{
                                     {
                                         parts.action = "alarm";
                                         parts.cmd = '03';
-                                        //tbs.sendMessage('accelerometer reading' + new Date() + ' imei '+ position.device_id);
                                         var value = converter.bytesToInt(buf, i, 1);
                                         //console.log('accelerometer reading', 253,value);
                                         switch (value) {
@@ -239,7 +231,6 @@ class adapter{
                                     {
                                         parts.action = "alarm";
                                         parts.cmd = '03';
-                                        // tbs.sendMessage('accelerometer reading' + new Date() + ' imei '+ position.device_id);
                                         var value = converter.bytesToInt(buf, i, 1);
                                         //console.log('accelerometer reading', 254,value);
                                         switch (value) {
@@ -268,8 +259,6 @@ class adapter{
                                     {
                                         parts.action = "alarm";
                                         parts.cmd = '03';
-                                        //console.log('accelerometer reading', new Date());
-                                        //tbs.sendMessage('accelerometer reading' + new Date() + ' imei '+ position.device_id)
                                         var value = converter.bytesToInt(buf, i, 1);
                                         switch (value) {
                                             case 1:
@@ -555,7 +544,6 @@ class adapter{
                                         case 253: {
                                             parts.action = "alarm";
                                             parts.cmd = '03';
-                                            //tbs.sendMessage('accelerometer reading' + new Date() + ' imei '+ position.device_id);
                                             var value = converter.bytesToInt(buf, i, 1);
                                             //console.log('accelerometer reading', 253,value);
                                             switch (value) {
@@ -580,9 +568,7 @@ class adapter{
                                         case 254: {
                                             parts.action = "alarm";
                                             parts.cmd = '03';
-                                            // tbs.sendMessage('accelerometer reading' + new Date() + ' imei '+ position.device_id);
                                             var value = converter.bytesToInt(buf, i, 1);
-                                            //console.log('accelerometer reading', 254,value);
                                             switch (value) {
                                                 case 1: {
                                                     position.alarm = "ha";

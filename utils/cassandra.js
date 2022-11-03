@@ -477,14 +477,14 @@ exports.getAllDevicesAsync = () => {
 };
 
 exports.getAllDevices = function (callback) {
-	//return callback(null,[{imei:351608082503363,positioning_time:new Date(),reg_no:'HR47D1851'}]);
+	//return callback(null,[{imei:868298060394807,positioning_time:new Date(),reg_no:'NL01AC2431'}]);
 	let  positionTime = new Date();
 	positionTime.setDate(positionTime.getDate() - 10);
 	positionTime = positionTime.getTime();
 	let aParams = [positionTime,config.externalip || '52.77.145.71'];
-	//let aParams = [positionTime,config.externalip ||'52.77.111.181'];
-	//const query = 'SELECT imei,user_id,reg_no,dist_yesterday,dist_d_2,dist_d_3,dist_d_4,dist_d_5,dist_d_6,odo,positioning_time FROM ' + database.table_device_inventory +' WHERE positioning_time > '+positionTime +' AND ip = '+ config.externalip + ' ALLOW FILTERING';
 	const query = 'SELECT imei,user_id,reg_no,dist_yesterday,dist_d_2,dist_d_3,dist_d_4,dist_d_5,dist_d_6,odo,positioning_time FROM ' + database.table_device_inventory +' WHERE positioning_time > ? AND ip = ? ALLOW FILTERING';
+	//let aParams = [positionTime,'NAVKAR'];
+	//const query = 'SELECT imei,user_id,reg_no,dist_yesterday,dist_d_2,dist_d_3,dist_d_4,dist_d_5,dist_d_6,odo,positioning_time FROM ' + database.table_device_inventory +' WHERE positioning_time > ? AND user_id = ? ALLOW FILTERING';
     const options = { prepare : true , fetchSize : 1000 };
     let aDevices = [];
     cassandraDbInstance.eachRow(query, aParams, options, function (n, row) {
@@ -514,8 +514,7 @@ exports.getAllDeviceIdsAsync = () => {
 
 exports.getAllDeviceIds = function (callback) {
 	const query = 'SELECT imei FROM ' + database.table_device_inventory+' ALLOW FILTERING';
-   
-	//const query = 'SELECT DISTINCT device_id FROM ' + database.table_gps_data;
+
     const options = { prepare : true , fetchSize : 1000 };
     let aDevices = [];
 	let aParams = [];

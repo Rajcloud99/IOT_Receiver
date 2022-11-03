@@ -1,9 +1,7 @@
-const util = require('util');
 const net = require('net');
 const extend = require('node.extend');
 const Device = require('../gpsdevice');
 const winston = require('../utils/logger');
-const telegramBotService = require('../services/telegramBotService');
 
 class Server {
 
@@ -84,18 +82,6 @@ class Server {
 	}
 
 	add_device(device) {
-        if(this.devices[device.getUID()] && (device.model_name == 'ks199' || device.model_name == 'tk103')){
-			if(this.devices[device.getUID()].last_login){
-				//console.log(device.getUID(),device.model_name,device.user_id,this.devices[device.getUID()].login_count,(Date.now()-new Date(this.devices[device.getUID()].last_login).getTime())/60000);
-				if(this.devices[device.getUID()].login_count){
-                    device.login_count = this.devices[device.getUID()].login_count;
-                    device.login_count++;
-				}
-			}
-		}else{
-            device.login_count = 1;
-            device.last_login = Date.now();
-		}
         this.devices[device.getUID()] = device;
 	}
 
