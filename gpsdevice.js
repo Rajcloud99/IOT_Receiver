@@ -2,7 +2,6 @@ const geozoneCalculator = require('./services/geozoneCalculator');
 const deviceService = require('./services/deviceService');
 const alarmService = require('./services/alarmService');
 const winston = require('./utils/logger');
-const tbs = require('./services/telegramBotService');
 const cassandra = require('./utils/cassandra');
 const externalip = require('./config').externalip;
 const socketServer = require('./servers/socketserver');
@@ -12,12 +11,8 @@ const dbUtils = require('./utils/dbUtils');
 const database = require('./config').database;
 const alarms = require('./config').alarms;
 const servers = require('./servers/servers');
-const tripService = require('./services/tripService');
 const dateUtils = require('./utils/dateutils');
 const config = require('./config');
-const net = require('net');
-const deviceDebugger = require('./utils/debugDevice');
-const genUtils = require('./utils/genUtils');
 const lmsSocketServer = require('./servers/lmssocket');
 const dataProcessing = require('./utils/dataProcessing');
 const lmsDbService = require('./services/lmsDbService');
@@ -52,16 +47,12 @@ class Device {
 
 		this.dataListener = data => {
 			this.processData(data);
-
-			if (this.shouldRedirectToDevelop && this.client) {
-				this.client.write(data);
-			}
 		};
 
 		this.logAll = false;
         //put imei in config to log its data
 		if(!config.logOne) {
-			this.logOne = 869270043114122
+			this.logOne = 357073295741991
 		}else{
 			this.logOne = config.logOne;
 		}
@@ -71,30 +62,20 @@ class Device {
 				console.log('endListener',this.getUID());
 			}
 			if(this.connection) this.connection.end();
-            //TODO fix conn
-            //console.log('endListener',this.getUID(),this.port,this.model_name);
-			//this.connection.destroy(new Error('device side end')); // This will emit events error and close, so no need to handle close separately
-		};
+       	};
 
 		this.closeListener = had_error => {
-           //console.log('closeListener',this.getUID(),this.port,this.model_name);
-			// winston.info(thisServer.getAdapter().model_name + ' TOTAL CONNECTED DEVICES CONN BEFORE  CLOSE: ' + thisServer.getNumOfActiveConnections());
-			if(this.getUID() == this.logOne){
+       	if(this.getUID() == this.logOne){
 				console.log('closeListener',this.getUID());
 			}
+			if(had_error){
+				console.error('this.closeListener error had_error ',had_error,this.getUID());
+			}
 			this.handleDisconnection();
-			// if(!had_error) tbs.sendMessage(this.getUID(), this.model_name, 'close', this.latestLocation ? this.latestLocation.gsm_signal_str : null);
-			// delete this.connection;
-			// delete this;
-
-			if (this.shouldRedirectToDevelop && this.client) this.client.destroy();
-
 		};
 
 		this.timeoutListener = () => {
-            //console.log('timeoutListener',this.getUID());
-			// This will emit events error and close, so no need to handle close separately
-			if(this.getUID() == this.logOne){
+            if(this.getUID() == this.logOne){
 				console.log('timeoutListener',this.getUID());
 			}
             this.connection.end();
@@ -102,8 +83,7 @@ class Device {
 		};
 
 		this.errorListener = err => {
-            //console.log('errorListener',err,this.getUID());
-			if(this.getUID() == this.logOne){
+          	if(this.getUID() == this.logOne){
 				console.log('errorListener',this.getUID());
 			}
             if(this.connection) this.connection.end();
@@ -120,36 +100,13 @@ class Device {
 	attachConnectionListeners() {
 		this.connection.on('data', this.dataListener);
 		this.connection.on('end', this.endListener);
-		// Remove the device from the list when it leaves
 		this.connection.on('close', this.closeListener);
 		this.connection.on('timeout', this.timeoutListener);
 		this.connection.on('error', this.errorListener);
-
-		if (this.shouldRedirectToDevelop) this.connectToDevelopServer();
-
-	}
-
-	connectToDevelopServer() {
-		const HOST = 'mewada.in';
-		const PORT = this.port;
-		if(true){//this.port == 3003 || this.port == 3012){//allow only mt90 and GT300
-            this.client = new net.Socket();
-            this.client.connect(PORT, HOST, () => {
-                this.clientConnected = true;
-            });
-            this.client.on('close', function() {
-                console.log('develop server Connection closed');
-            });
-            this.client.on('error', function() {
-                console.log('develop server Connection error');
-                //this.shouldRedirectToDevelop = false;
-            });
-		}
 	}
 
 	detachConnectionListeners() {
-        //console.log('detachConnectionListeners',this.getUID());
-		this.connection.removeListener('data', this.dataListener);
+      	this.connection.removeListener('data', this.dataListener);
 		this.connection.removeListener('end', this.endListener);
 		this.connection.removeListener('close', this.closeListener);
 		this.connection.removeListener('timeout', this.timeoutListener);
@@ -162,33 +119,28 @@ class Device {
 	processData(data) {
 	    const msg_parts = this.adapter.parse_data(data);
 
-		if (!msg_parts) { //something bad happened
-			// winston.error("The message (" + data.toString('hex') + ") from device:" + this.getUID() + "can't be parsed. Discarding...");
+		if (!msg_parts) { //protocol not decoded properly or invalid data sent from device
 			return;
 		}
         if (!msg_parts.device_id) {
-            //winston.error(this.model_name, 'no device id in data itself!');
+			//console.log('packet without device id',this.model_name);
             //return;
         }
 
         if (!this.getUID() && !msg_parts.device_id) {
-            winston.error(this.model_name, 'no device id!');
+            console.error(this.model_name, 'no device id!');
             //TODO fix protocol
-            //winston.info("no device id for "+  this.model_name + " " + JSON.stringify(msg_parts));
+            console.log("no device id for "+  this.model_name + " " + JSON.stringify(msg_parts));
             return;
         }
 
 		if (!msg_parts.cmd) {
-			// winston.error('no command');
 			return;
 		}
 
-		//this.debug_data_packet(data, msg_parts);
-		//If the UID of the devices it hasn't been setted, do it now.
 		if (!this.getUID()) {
 			this.setUID(msg_parts.device_id);
-			// tbs.sendMessage(this.getUID(), 'connected');
-            if (this.server.find_device(this.getUID())) {
+			if (this.server.find_device(this.getUID())) {
             	if(this.logOne){
             		let oldDeviceConn = this.server.find_device(this.getUID());
             		if(oldDeviceConn.latestLocation && oldDeviceConn.latestLocation.datetime){
@@ -198,10 +150,7 @@ class Device {
 						console.log('overriding connection for ',this.getUID(),this.model_name);
 					}
 				}
-            	// Device is already connected
-				//if(this.model_name == 'ks199' || this.model_name == 'tk103'){
-					//console.log(this.getUID(),this.model_name,this.server.find_device(this.getUID()).connection.c_id,this.connection.c_id,this.server.find_device(this.getUID()).user_id);
-				//}
+
 				this.detachConnectionListeners();
 				this.server.find_device(this.getUID()).detachConnectionListeners();
 				this.server.find_device(this.getUID()).connection.destroy();
@@ -236,24 +185,11 @@ class Device {
 		}
 	}
 
-	debug_data_packet(data, msg_parts) {
-		var oData = {};
-		oData.packet = JSON.stringify(data);
-		oData.parts = JSON.stringify(msg_parts);
-		oData.ip = externalip;
-		oData.model = this.model_name;
-		oData.datetime = Date.now();
-		oData.device_id = msg_parts.device_id || this.getUID();
-		oData.cmd = msg_parts.cmd;
-		deviceDebugger.deubgDeviceData(oData);
-	}
-
 	make_action(action, msg_parts) {
 		//If we're not logged
 		if (action !== "login_request" && !this.loged) {
 			this.adapter.request_login_to_device(msg_parts);
 			// winston.error(this.model_name, this.getUID(),  " is trying to '" + action + "' but it isn't logged in. Action wasn't executed");
-			// winston.info(JSON.stringify(msg_parts));
 			return false;
 		}
 		switch (action) {
@@ -273,7 +209,7 @@ class Device {
 	}
 
 	/****************************************
-	 LOGIN & LOGOUT
+	 LOGIN
 	 ****************************************/
 	login_request(msg_parts) {
 
@@ -290,29 +226,16 @@ class Device {
 
 		// var existingDevice = servers[options.type].find_device(device_id);   Handle this properly later
 
-
 		this.server.add_device(this);
-		setTimeout(() => {
-			this.getAlarms();
-            //this.updateDistanceToday();
-			cassandra.insertServerIpAndStatus(this.getUID(), externalip, this.port, this.model_name);
-		}, genUtils.getRandomIntInclusive(0, 60000));
-
-		socketServer.deviceConnected(this.getUID());
-     	// winston.info(this.model_name + ' TOTAL CONNECTED DEVICES: ' + this.server.getNumOfActiveConnections());
+		this.getAlarms();
+		cassandra.insertServerIpAndStatus(this.getUID(), externalip, this.port, this.model_name);
 	}
 
 	login_authorized(val, msg_parts) {
 		if (val) {
-			// winston.info("Device " + this.getUID() + " has been authorized. Welcome!");
 			this.loged = true;
 			this.adapter.authorize(msg_parts);
 		}
-	}
-
-	logout() {
-		this.loged = false;
-		this.adapter.logout();
 	}
 
 	/****************************************
@@ -460,6 +383,7 @@ class Device {
 	}
 
 	initiateLatestLocationIfStopped(gps_data, callback) {
+
 		if (this.latestLocation) return callback();
 		dbUtils.getAsync(database.table_device_inventory, ['location_time', 'lat', 'lng', 'positioning_time', 'reg_no', 'last_alert_type', 'last_alert_time',
 			'address','odo','dist_today','user_id','driver_name','driver_name2','rfid1','rfid2','driver','acc_high','acc_high_time','power_supply','power_supply_time','sens_fl','f_lvl'], {imei: this.getUID()})
@@ -488,8 +412,13 @@ class Device {
 					this.acc_high_time = new Date(device.acc_high_time || new Date()).getTime(); 
 				}
 				if(device.power_supply == true || device.power_supply == false){//avoid null and undefined valued
+					this.latestPower = {
+						power_supply : device.power_supply,
+						start_time : new Date(device.power_supply_time || new Date()).getTime()
+					};
 					this.power_supply = device.power_supply;
 					this.power_supply_time = new Date(device.power_supply_time || new Date()).getTime();
+
 				}
 				if(device.sens_fl){
 					this.fuel_sensor_m_fact = device.sens_fl;
@@ -497,18 +426,7 @@ class Device {
 				if(device.f_lvl){
 					this.f_lvl = device.f_lvl;
 				}
-               /*
-                //check if acc_high changed for current coordinate
-				//TODO What if this one id old data packate ? we can not assign to latest val
-				//take latest acc_hig from 
-				if(gps_data.ignition == 1 || gps_data.ignition == 0){//ignition value in gpsData coming from device
-			    	this.acc_high = gps_data.ignition;
-				}
-				*/
-
-
-				//last halt processing start
-				if (!device.location_time) return Promise.resolve();
+          		if (!device.location_time) return Promise.resolve();
 
 				if(gps_data.datetime > new Date(device.positioning_time).getTime()){
 					//ignore old cache data as it will re calc same dist
@@ -592,36 +510,6 @@ class Device {
 			gps_data.f_lvl = this.fuel_sensor_m_fact * gps_data.fl;
 		}
 		gps_data.inserted = Date.now();
-		/*
-		//check ignition from latestLocation
-		//Doubt : why ignition value not coming
-		if((this.acc_high == true || this.acc_high == false) && (gps_data.ignition == undefined || gps_data.ignition == null)){
-			if(this.getUID() == this.logOne){
-				console.log(' acc_high but no ignition ',this.getUID(),this.model_name);
-			}
-			if(this.acc_high_time){
-				let diffTime = new Date(gps_data.datetime).getTime() - new Date(this.acc_high_time).getTime();
-				let allowedMillisecond = 240000;//4 min
-				//console.log(' acc_high allowedMillisecond ',this.getUID(),diffTime);
-				if(this.getUID() == this.logOne){
-				//	console.log(' acc_high allowedMillisecond ',this.getUID(),diffTime);
-				}
-				//if(diffTime < allowedMillisecond &&  diffTime > -1*allowedMillisecond){
-					//console.log(' acc_high allowedMillisecond ',this.getUID(),diffTime);
-					if(this.acc_high == true){
-						gps_data.ignition = 1
-					}
-					if(this.acc_high == false){
-						gps_data.ignition = 0
-					}
-				//}
-			}else{
-				if(this.getUID() == this.logOne){
-					console.log(' acc_high but no acc_high_time ',this.getUID(),this.model_name);
-				}
-			}
-		}
-		*/
 		cassandra.insertGPSData(getCopy(gps_data));
 
         if(this.aGpsgaadi && this.aGpsgaadi.length && gps_data.lat && prepareAPIdata){
@@ -634,12 +522,6 @@ class Device {
 			callback('old data');
 			return;
 		}
-		/*else if ((gps_data.datetime - this.lastLocationTime) < 5 * 60 * 1000) {
-			if (this.logAll || this.getUID() === this.logOne) winston.error('too soon', (gps_data.datetime - this.lastLocationTime) / 1000);
-            //console.log('too soon data',this.getUID(),new Date(gps_data.datetime));
-            callback('too soon');
-			return;
-		}*/
 
 		this.lastLocationTime = gps_data.datetime;
 		gps_data.positioning_time = gps_data.datetime;
@@ -662,19 +544,11 @@ class Device {
                 }
             }
 			if (dur > 0 && dist / dur * 3.6 > 160) {
-				/*
-				 At this point we don't know which data is wrong, latestLocation or gps_data.
-				 latestLocation can be wrong only if previous ping was the first ping and it is after 20 mins of the ping before it.
-				 Otherwise it would have been removed in the previous call of this function, at this point.
-				 Other solution would be to track the abovementioned scenario, but what the heck.
-				 */
-				//console.error('invalid data speed > 160',this.getUID(),dur,dist,gps_data.gps_tracking,gps_data.lat,gps_data.lng);
 				this.latestLocation = null;
 				if (this.logAll || this.getUID() === this.logOne) winston.error('invalid data');
 				callback('invalid data for speed');
 				return;
 			}
-			//Current Hlat Processing start
 			let haltDist;
 			if(this.latestLocation.halt_location){
 				haltDist = geozoneCalculator.getDistance(this.latestLocation.halt_location, {
@@ -701,8 +575,6 @@ class Device {
 				gps_data.halt_location = this.latestLocation.halt_location;
 				if ((gps_data.datetime - gps_data.location_time) > 180 * 1000) { // if veh did not move for 3 min set speed as zero
 					if (this.logAll || this.getUID() === this.logOne) winston.info('speed correction, orig:', gps_data.speed, ' calc:', (haltDist / 1000) / (dur / 3600), ' across:', dur, ' sec');
-					//TODO check logic of overiding sped
-					// gps_data.speed = 0;
 				}
 			}
 		} else {
@@ -724,7 +596,7 @@ class Device {
 			this.processAccData(gps_data);
 		}
 
-		//curent power supply processing
+		//current power supply processing
 		if(gps_data.power_supply == true || gps_data.power_supply == false ){
 			this.processPowerSupplyData(gps_data);
 		}
@@ -759,24 +631,12 @@ class Device {
 
 		this.processAggregatedDrivesAndStopsReport(getCopy(gps_data));
 
-		if(this.model_name == 'ais140' || this.model_name == 'm2c2025' || this.model_name == 'fmb910' ){
-			//this.processOverspeedDurationReportV2(getCopy(gps_data));
-			//this.processNightDriveReport(getCopy(gps_data));
-			//this.processIdleDriveReport(getCopy(gps_data));
-			//this.processNeutralDriveReport(getCopy(gps_data));
-		}
-
-		if(this.model_name == 'ais140'){
-			//this.processSeatBeltReport(getCopy(gps_data));
-		}
-		//this.processOverspeedReport(getCopy(gps_data));
 		callback();
 	}
 
 	fetchLocation(from) {
 		if (this.logAll || this.getUID() === this.logOne) winston.info('fetchLocation from', from, (Date.now() - this.lastLocationTime) < 50 * 1000 ? 'no need' : 'done');
 		if ((Date.now() - this.lastLocationTime) < 120000) return;//4 min interval no fetch location
-		// tbs.sendMessage(this.getUID(), 'fetching location from', from);
 		if(this.model_name == 'tr02' ||  this.model_name == 'tr06' || this.model_name == 'crx' || this.model_name == 'vt2' || this.model_name == 'tr06n'  || this.model_name == 'tr06f'){
 			this.adapter.get_location();
 		}
@@ -789,13 +649,11 @@ class Device {
 	receive_alarm(data, isParsed, extra) {
 		if (!data) return;
 		let alarm_code, oGPSData;
-		//We pass the message parts to the adapter and they have to say which type of alarm it is.
 		if (isParsed) {
 			alarm_code = data;
 		} else {
 			oGPSData = this.adapter.receive_alarm(data);
 			if (oGPSData && oGPSData.alarm_terminal) {
-				//console.log('oGPSData.alarm_terminal', oGPSData.alarm_terminal,this.model_name);
 				alarm_code = oGPSData.alarm_terminal;
 			}
 		}
@@ -849,13 +707,10 @@ class Device {
 				speed: this.latestLocation.speed,
 				course: this.latestLocation.course
 			};
-		} else {
-			// tbs.sendMessage(this.model_name, 'no latestLocation for alarm');
 		}
 
 		if (alarm.code == 'sos' && this.last_alert_type && this.last_alert_type === alarm.code && (alarm.datetime - this.last_alert_time) < 2 * 60 * 1000) {
 			console.log('duplicate alerts SOS', this.reg_no);
-			//tbs.sendMessage('duplicate sos', this.reg_no, this.model_name, JSON.stringify(alarm));
 			return;
 		}
 		that.last_alert_type = alarm.code;
@@ -871,77 +726,28 @@ class Device {
 		if(!alarm.location){
 			return;
 		}
-		if (alarm_code == 'ha' || alarm_code == 'hb') {
-			console.log('oGPSData.location.datetime',oGPSData.location.datetime);
-			//  let vAc = this.validateAcceleration(alarm, function (err, valid) {});
-           	cassandra.getLastAlertsAsync(alarm)
-					.then(aAlerts => {
-						let bSendAlert = true;
-						if(aAlerts && aAlerts[0]){
-							bSendAlert = false;
-							console.log('stop harsh breaking alert as within 1 days',aAlerts[0]);
-						}
-						if(bSendAlert){
-							dbUtils.update(database.table_device_alerts, {
-								imei: alarm.imei,
-								code: alarm.code,
-								datetime: alarm.datetime,
-								extra: alarm.extra,
-								location: alarm.location,
-								driver: alarm.driver,
-								user_id: alarm.user_id
-							}, () => {
-							});
-							addressService.upsertAlerts(alarm, (err, resp) => {
-								if (err) {
-									tbs.sendMessage('upsertAlerts error', err.toString());
-									console.error('upsertAlerts error', err);
-								}
-								let oNotif = {
-									"include_external_user_ids": [alarm.user_id],
-									"contents": {
-										"en": alarm.msg
-									},
-									"data": {
-										reg_no: alarm.reg_no,
-										user_id: alarm.user_id,
-									},
-									"name": alarm.code
-								};
-								oneSignalNotification.sendOneSignalNotification(oNotif);
-							});
-						}
-					}).catch(function (err) {
-					if (err){
-						console.error('alert get err.message',err);
-					}
-				});
-		} else {
-			addressService.upsertAlerts(alarm, (err, resp) => {
-				if (err) {
-					tbs.sendMessage('upsertAlerts error', err.toString());
-					console.error('upsertAlerts error', err);
-				}
-				let oNotif = {
-					"include_external_user_ids": [alarm.user_id],
-					"contents": {
-						"en": alarm.msg
-					},
-					"data": {
-						reg_no: alarm.reg_no,
-						user_id: alarm.user_id,
-					},
-					"name": alarm.code
-				};
-				oneSignalNotification.sendOneSignalNotification(oNotif);
-			});
-			alarmService.sendAlerts(alarm);
-			if(config.lms && config.lms.userAllowedForTripForAll){
+		addressService.upsertAlerts(alarm, (err, resp) => {
+			if (err) {
+				console.error('upsertAlerts error', err);
+			}
+			let oNotif = {
+				"include_external_user_ids": [alarm.user_id],
+				"contents": {
+					"en": alarm.msg
+				},
+				"data": {
+					reg_no: alarm.reg_no,
+					user_id: alarm.user_id,
+				},
+				"name": alarm.code
+			};
+			oneSignalNotification.sendOneSignalNotification(oNotif);
+		});
+		if(config.lms && config.lms.userAllowedForTripForAll){
+			//emailService.sendAlertMails(getCopy(alarm));
+		}else if(config.lms && config.lms.userAllowedForTrip && config.lms.userAllowedForTrip.length){
+			if(config.lms.userAllowedForTrip.indexOf(that.user_id ) > -1){
 				//emailService.sendAlertMails(getCopy(alarm));
-			}else if(config.lms && config.lms.userAllowedForTrip && config.lms.userAllowedForTrip.length){
-				if(config.lms.userAllowedForTrip.indexOf(that.user_id ) > -1){
-					//emailService.sendAlertMails(getCopy(alarm));
-				}
 			}
 		}
 	}
@@ -949,9 +755,7 @@ class Device {
      RECEIVING receive others sos like
      ****************************************/
     receive_others(data, isParsed, extra) {
-    	//console.log('receive others');
-        //We pass the message parts to the adapter and they have to say which type of alarm it is.
-        const alarm_code = isParsed ? data : this.adapter.receive_others(data);
+    	 const alarm_code = isParsed ? data : this.adapter.receive_others(data);
 
         if (!alarm_code) return;
         if (Object.keys(alarms).indexOf(alarm_code) < 0) return;
@@ -979,17 +783,6 @@ class Device {
             };
         }
 
-/*
-        dbUtils.update(database.table_device_alerts, {
-            imei: alarm.imei,
-            code: alarm.code,
-            datetime: alarm.datetime,
-            extra: alarm.extra,
-            location: alarm.location
-        }, () => {
-        });
-*/
-
         dbUtils.update(database.table_device_inventory, {
             imei: alarm.imei,
             last_alert_type: alarm.code,
@@ -1005,7 +798,6 @@ class Device {
         } else {
             this.last_alert_type = alarm.code;
             this.last_alert_time = alarm.datetime;
-            alarmService.sendAlerts(alarm);
         }
 
     }
@@ -1017,9 +809,7 @@ class Device {
 		const handshake_data = this.adapter.receive_handshake(msg_parts);
 
 		if (handshake_data.acc_high == true || handshake_data.acc_high == false) {
-			//this.acc_high = handshake_data.acc_high;
 			this.processAccData(getCopy(handshake_data));
-			//cassandra.insertHeartbeat(getCopy(handshake_data), this.model_name, this.getUID());
 			let oDev = {
 				imei : this.getUID(),
 				acc_high : handshake_data.acc_high,
@@ -1029,17 +819,11 @@ class Device {
 				oDev.acc_high_time = this.latestAccHigh.start_time;
 				//console.log('no acc_high_time',this.getUID(),this.model_name);
 			}
-			//cassandra.insertDeviceStatus(this.getUID(), handshake_data.acc_high,this.latestAccHigh.start_time,handshake_data.gsm_signal_str);
 			deviceService.updateDeviceInventory(oDev, (err, res) => {
 			});
-			//this.processAccReport(getCopy(handshake_data));
 		}else{
 		      //for tr02
 		      cassandra.insertDeviceStatusOnly(this.getUID(),'online');
-		}
-
-		if (!this.latestLocation) {
-			//this.fetchLocation('handshake');
 		}
 	}
 
@@ -1048,18 +832,13 @@ class Device {
 	 ****************************************/
 
 	receive_string_info(msg_parts) {
-		// winston.info('msg parts:' + JSON.stringify(msg_parts));
 		const command_data = this.adapter.receive_string_info(msg_parts);
-		// winston.info('command data:' + JSON.stringify(command_data));
 
 		if (!command_data.command_type) return;
 
-
 		if (command_data.command_type === 'location') {
 			if (!command_data.data) return;
-			// command_data.data.datetime = Date.now();
 			if (this.logAll || this.getUID() === this.logOne) winston.info(this.processingPing, 'processPingData from get Location', JSON.stringify(command_data.data));
-			// tbs.sendMessage(this.getUID(), 'got location from command', JSON.stringify(command_data.data));
 			if(this.model_name != 'tk103'){
 				this.ping(command_data.data, true);
 			}else{
@@ -1080,8 +859,6 @@ class Device {
 
 	send_byte_array(array) {
 		const buff = new Buffer(array);
-		// winston.info(buff);
-		// winston.info("Sending to " + this.uid + ": <Array: [" + array + "]>");
 	}
 
 	fetchAddressIfRequired(lat, lng, callback) {
@@ -1093,7 +870,6 @@ class Device {
         //if(true){//fetch for all from same server
 		let that = this;
 		if(this.model_name == 'tk103' || this.model_name == 'ks199'){
-		//if(this.user_id == 'DGFC' || this.user_id == 'kamal' || this.user_id == 'mayank'){
 			let oSettings =   {
 				lat :lat,
 				lng:lng,
@@ -1105,7 +881,6 @@ class Device {
 			that.lastAddrTime = Date.now();
             callback();
         }).catch(err => {
-                // tbs.sendMessage('aws addr fetch err', err);
             callback(err);
         });
         }else{
@@ -1115,7 +890,6 @@ class Device {
                 that.lastAddrTime = Date.now();
                 callback();
             }).catch(err => {
-                // tbs.sendMessage('aws addr fetch err', err);
                 callback(err);
             });
         }
@@ -1195,27 +969,6 @@ class Device {
 					}
 					this.latestADASEntry.fetchGoogleAddress = data.fetchGoogleAddress;
 					this.latestADASEntry.stop_addr = this.address;
-
-					if (!this.latestADASEntry.start_addr) {
-						// console.log(this.getUID(), 'adas no start addr', this.address);
-						// tbs.sendMessage(this.getUID(), 'adas no start addr', this.address);
-
-					}
-					if (!this.latestADASEntry.stop_addr) {
-						// console.log(this.getUID(), 'adas no stop addr', this.processingPing, this.address);
-						// tbs.sendMessage(this.getUID(), 'adas no stop addr', this.processingPing, this.address);
-					}
-
-					//cassandra.upsertAggregatedDrivesAndStopsReportEntry(getCopy(this.latestADASEntry));
-					/*
-					if(this.latestADASEntry.drive){
-                        this.dist_today += this.latestADASEntry.distance;
-                        dbUtils.update(database.table_device_inventory, {
-                            imei: this.getUID(),
-                            dist_today: this.dist_today
-                        });
-					}
-					*/
 					this.latestADASEntry = null;
 					data.fetchGoogleAddress = false;
 					this.processAggregatedDrivesAndStopsReport(data);
@@ -1223,347 +976,6 @@ class Device {
 			}
 		}
 	}
-
-	processAccReport(data) {
-		if (!this.latestLocation) return;
-		if (!this.latestAccEntry) {
-			this.latestAccEntry = {};
-			this.latestAccEntry.imei = this.getUID();
-			this.latestAccEntry.start_time = data.datetime;
-			this.latestAccEntry.acc_high = data.acc_high;
-		} else if (this.latestAccEntry.acc_high !== data.acc_high) {
-			const duration = data.datetime - this.latestAccEntry.start_time;
-			this.latestAccEntry.duration = duration / 1000;
-			this.latestAccEntry.end_time = data.datetime;
-			cassandra.upsertAccReportEntry(getCopy(this.latestAccEntry), this.model_name, this.getUID());
-			this.latestAccEntry = null;
-			this.processAccReport(data);
-		}
-	}
-
-	processOverspeedReport(data) {
-		if (!this.latestLocation) return;
-		if (data.speed > 65) {
-			if (!this.latestOverspeed) {
-				this.latestOverspeed = {};
-				this.latestOverspeed.imei = this.getUID();
-				this.latestOverspeed.start_time = data.datetime;
-				this.latestOverspeed.start = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestOverspeed.prev = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestOverspeed.top_speed = data.speed;
-				this.latestOverspeed.distance = 0;
-				this.latestOverspeed.start_addr = this.address;
-			} else {
-				this.latestOverspeed.distance += geozoneCalculator.getDistance(this.latestOverspeed.prev, {
-					latitude: data.lat,
-					longitude: data.lng
-				});
-				this.latestOverspeed.prev = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestOverspeed.top_speed = data.speed > this.latestOverspeed.top_speed ? data.speed : this.latestOverspeed.top_speed;
-			}
-		} else if (this.latestOverspeed && this.latestOverspeed.start_time) {
-			const duration = data.datetime - this.latestOverspeed.start_time;
-			this.latestOverspeed.duration = duration / 1000;
-			this.latestOverspeed.end_time = data.datetime;
-			this.latestOverspeed.stop = {
-				latitude: data.lat,
-				longitude: data.lng
-			};
-			cassandra.upsertOverspeedReportEntry(getCopy(this.latestOverspeed));
-			this.latestOverspeed = null;
-		}
-	}
-
-	processOverspeedDurationReport(data) {
-		if (!this.latestLocation) return;
-		if (data.speed > 67 && data.speed < 130) {
-			if (!this.latestOverspeedDuration) {
-				this.latestOverspeedDuration = {};
-				this.latestOverspeedDuration.imei = this.getUID();
-				this.latestOverspeedDuration.datetime = data.datetime;
-				this.latestOverspeedDuration.extra = data.speed;
-				this.latestOverspeedDuration.code = 'over_speed';
-				this.latestOverspeedDuration.driver =  this.driver || this.driver_name;
-				this.latestOverspeedDuration.reg_no = this.reg_no;
-				this.latestOverspeedDuration.user_id = this.user_id;
-				this.latestOverspeedDuration.start = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestOverspeedDuration.location = {
-					lng: data.lng,
-					course: data.course,
-					lat: data.lat,
-					address: this.latestLocation.address,
-					speed: data.speed,
-				};
-				this.latestOverspeedDuration.prev = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestOverspeedDuration.top_speed = data.speed;
-				this.latestOverspeedDuration.distance = 0;
-				this.latestOverspeedDuration.start_addr = this.address;
-			} else {
-				this.latestOverspeedDuration.distance += geozoneCalculator.getDistance(this.latestOverspeedDuration.prev, {
-					latitude: data.lat,
-					longitude: data.lng
-				});
-				this.latestOverspeedDuration.prev = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestOverspeedDuration.top_speed = data.speed > this.latestOverspeedDuration.top_speed ? data.speed : this.latestOverspeedDuration.top_speed;
-				const duration = data.datetime - this.latestOverspeedDuration.datetime;
-				this.latestOverspeedDuration.duration = duration / 1000;
-				if(parseInt(this.latestOverspeedDuration.duration) > 60){//duration greater than 25 seconds
-					addressService.upsertAlerts(getCopy(this.latestOverspeedDuration),function(err,resp){});
-				}
-			}
-		} else if (this.latestOverspeedDuration) {
-			const duration = data.datetime - this.latestOverspeedDuration.datetime;
-			this.latestOverspeedDuration.duration = duration / 1000;
-			this.latestOverspeedDuration.end_time = data.datetime;
-			this.latestOverspeedDuration.stop = {
-				latitude: data.lat,
-				longitude: data.lng
-			};
-			if(parseInt(this.latestOverspeedDuration.duration) > 60){//duration greater than 60 seconds
-				addressService.upsertAlerts(getCopy(this.latestOverspeedDuration),function(err,resp){});
-				//emailService.sendAlertMails(getCopy(this.latestOverspeedDuration));
-			}
-			this.latestOverspeedDuration = null;
-		}
-	}
-
-	processOverspeedDurationReportV2(data) {
-		if (!this.latestLocation) return;
-        let oSpeedConf = config && this.user_id && config.exception && config.exception[this.user_id.toLowerCase()] &&  config.exception[this.user_id.toLowerCase()].overspeed;
-		let speed_limit = (oSpeedConf && oSpeedConf.limit) || 67;
-		let speed_Dur =  (oSpeedConf && oSpeedConf.dur) || 1;
-		let eachNewInstance = oSpeedConf && oSpeedConf.eachNewInstance;
-		if (data.speed > speed_limit && data.speed < 130) {
-			if (!this.latestOverspeedDuration) {
-				this.latestOverspeedDuration = {};
-				this.latestOverspeedDuration.imei = this.getUID();
-				this.latestOverspeedDuration.datetime = data.datetime;
-				if(data.speed > 80){
-					data.speed = 67;
-				}
-				this.latestOverspeedDuration.extra = data.speed;
-				this.latestOverspeedDuration.code = 'over_speed';
-				this.latestOverspeedDuration.driver =  this.driver || this.driver_name;
-				this.latestOverspeedDuration.reg_no = this.reg_no;
-				this.latestOverspeedDuration.user_id = this.user_id;
-				this.latestOverspeedDuration.start = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestOverspeedDuration.location = {
-					lng: data.lng,
-					course: data.course,
-					lat: data.lat,
-					address: this.latestLocation.address,
-					speed: data.speed,
-				};
-				this.latestOverspeedDuration.prev = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestOverspeedDuration.top_speed = data.speed;
-				this.latestOverspeedDuration.distance = 0;
-				this.latestOverspeedDuration.start_addr = this.address;
-				this.latestOverspeedDuration.duration = 1;
-				if(eachNewInstance){
-					addressService.upsertAlerts(getCopy(this.latestOverspeedDuration),function(err,resp){});
-				}
-			}else {
-				this.latestOverspeedDuration.distance += geozoneCalculator.getDistance(this.latestOverspeedDuration.prev, {
-					latitude: data.lat,
-					longitude: data.lng
-				});
-				this.latestOverspeedDuration.prev = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestOverspeedDuration.top_speed = data.speed > this.latestOverspeedDuration.top_speed ? data.speed : this.latestOverspeedDuration.top_speed;
-				const duration = data.datetime - this.latestOverspeedDuration.datetime;
-				this.latestOverspeedDuration.duration = duration / 1000;
-				if(parseInt(this.latestOverspeedDuration.duration) > 60 * speed_Dur){//duration greater than 60 seconds
-					addressService.upsertAlerts(getCopy(this.latestOverspeedDuration),function(err,resp){});
-				}
-			}
-		} else if (this.latestOverspeedDuration) {
-			const duration = data.datetime - this.latestOverspeedDuration.datetime;
-			this.latestOverspeedDuration.duration = duration / 1000;
-			this.latestOverspeedDuration.end_time = data.datetime;
-			this.latestOverspeedDuration.stop = {
-				latitude: data.lat,
-				longitude: data.lng
-			};
-			if(parseInt(this.latestOverspeedDuration.duration) > 60 * speed_Dur){//duration greater than 60 seconds
-				addressService.upsertAlerts(getCopy(this.latestOverspeedDuration),function(err,resp){});
-				//emailService.sendAlertMails(getCopy(this.latestOverspeedDuration));
-			}
-			this.latestOverspeedDuration = null;
-		}
-	}
-
-	processNightDriveReport(data) {
-		if (!this.latestLocation) return;
-		let oNdConf = config && this.user_id && config.exception && config.exception[this.user_id.toLowerCase()] &&  config.exception[this.user_id.toLowerCase()].nd;
-		let ndStart = (oNdConf && oNdConf.st) || 23;
-		let ndEnd = (oNdConf && oNdConf.et) || 5;
-
-		if (data.speed > 3 && ((new Date(data.datetime).getHours() > ndStart) || (new Date(data.datetime).getHours() < ndEnd))) {
-			if (!this.latestNightDuration) {
-				this.latestNightDuration = {};
-				this.latestNightDuration.imei = this.getUID();
-				this.latestNightDuration.datetime = data.datetime;
-				this.latestNightDuration.code = 'nd';
-				this.latestNightDuration.driver =  this.driver || this.driver_name;
-				this.latestNightDuration.reg_no = this.reg_no;
-				this.latestNightDuration.user_id = this.user_id;
-				this.latestNightDuration.start = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestNightDuration.location = {
-					lng: data.lng,
-					course: data.course,
-					lat: data.lat,
-					address: this.latestLocation.address,
-					speed: data.speed,
-				};
-				this.latestNightDuration.prev = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestNightDuration.top_speed = data.speed;
-				this.latestNightDuration.distance = 0;
-				this.latestNightDuration.start_addr = this.address;
-			} else {
-				this.latestNightDuration.distance += geozoneCalculator.getDistance(this.latestNightDuration.prev, {
-					latitude: data.lat,
-					longitude: data.lng
-				});
-				this.latestNightDuration.prev = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestNightDuration.top_speed = data.speed > this.latestNightDuration.top_speed ? data.speed : this.latestNightDuration.top_speed;
-				const duration = data.datetime - this.latestNightDuration.datetime;
-				this.latestNightDuration.duration = duration / 1000;
-				this.latestNightDuration.end_time = data.datetime;
-				if(parseInt(this.latestNightDuration.duration) > 180){//duration greater than 25 seconds
-					addressService.upsertAlerts(getCopy(this.latestNightDuration),function(err,resp){});
-					if(this.latestNightDuration.imei == 862549046024132){
-						console.log('Night Duration',this.latestNightDuration.duration);
-					}
-				}
-			}
-		} else if (this.latestNightDuration) {
-			const duration = data.datetime - this.latestNightDuration.datetime;
-			this.latestNightDuration.duration = duration / 1000;
-			this.latestNightDuration.end_time = data.datetime;
-			this.latestNightDuration.stop = {
-				latitude: data.lat,
-				longitude: data.lng
-			};
-			this.latestNightDuration.extra = this.latestNightDuration.duration;
-			if(parseInt(this.latestNightDuration.duration) > 180){//duration greater than 25 seconds
-				addressService.upsertAlerts(getCopy(this.latestNightDuration),function(err,resp){});
-				//emailService.sendAlertMails(getCopy(this.latestNightDuration));
-				if(this.latestNightDuration.imei == 862549046024132){
-					console.log('Night Duration',this.latestNightDuration.duration);
-				}
-			}
-			this.latestNightDuration = null;
-		}
-	}
-
-    processSeatBeltReport(data) {
-        if (!this.latestLocation) return;
-		let oSBConf = config && this.user_id && config.exception && config.exception[this.user_id.toLowerCase()] &&  config.exception[this.user_id.toLowerCase()].sb;
-
-		if (data.sb == false && data.speed > 3) {
-        	if (!this.latestSeatBelt) {
-                this.latestSeatBelt = {};
-                this.latestSeatBelt.imei = this.getUID();
-                this.latestSeatBelt.datetime = data.datetime;
-                this.latestSeatBelt.code = 'sb';
-                this.latestSeatBelt.driver =  this.driver || this.driver_name;
-                this.latestSeatBelt.reg_no = this.reg_no;
-                this.latestSeatBelt.user_id = this.user_id;
-                this.latestSeatBelt.start = {
-                    latitude: data.lat,
-                    longitude: data.lng
-                };
-                this.latestSeatBelt.location = {
-                    lng: data.lng,
-                    course: data.course,
-                    lat: data.lat,
-                    address: this.latestLocation.address,
-                    speed: data.speed,
-                };
-                this.latestSeatBelt.prev = {
-                    latitude: data.lat,
-                    longitude: data.lng
-                };
-                this.latestSeatBelt.top_speed = data.speed;
-                this.latestSeatBelt.distance = 0;
-                this.latestSeatBelt.start_addr = this.address;
-            } else {
-                this.latestSeatBelt.distance += geozoneCalculator.getDistance(this.latestSeatBelt.prev, {
-                    latitude: data.lat,
-                    longitude: data.lng
-                });
-                this.latestSeatBelt.prev = {
-                    latitude: data.lat,
-                    longitude: data.lng
-                };
-                this.latestSeatBelt.top_speed = data.speed > this.latestSeatBelt.top_speed ? data.speed : this.latestSeatBelt.top_speed;
-				const duration = data.datetime - this.latestSeatBelt.datetime;
-				this.latestSeatBelt.duration = duration / 1000;
-				this.latestSeatBelt.end_time = data.datetime;
-				if(parseInt(this.latestSeatBelt.duration) > 180){//duration greater than 25 seconds
-					//addressService.upsertAlerts(getCopy(this.latestSeatBelt),function(err,resp){});
-					if(this.latestSeatBelt.imei == 862549047304947){
-						//tbs.sendMessage(this.getUID(), ' Seat Belt  With Speed');
-						//console.log('Seat Belt  with speed',this.latestSeatBelt.duration);
-						//addressService.upsertAlerts(getCopy(this.latestSeatBelt),function(err,resp){});
-					}
-				}
-            }
-        } else if (data.sb == true && this.latestSeatBelt) {
-            const duration = data.datetime - this.latestSeatBelt.datetime;
-            this.latestSeatBelt.duration = duration / 1000;
-            this.latestSeatBelt.end_time = data.datetime;
-            this.latestSeatBelt.stop = {
-                latitude: data.lat,
-                longitude: data.lng
-            };
-            this.latestSeatBelt.extra = this.latestSeatBelt.duration;
-            if(parseInt(this.latestSeatBelt.duration) > 180){//duration greater than 25 seconds
-				//emailService.sendAlertMails(getCopy(this.latestSeatBelt));
-				if(this.latestSeatBelt.imei == 862549047304947){
-					//tbs.sendMessage(this.getUID(), ' Seat Belt  With Speed');
-					//console.log('Seat Belt  with speed',this.latestSeatBelt.duration);
-					//addressService.upsertAlerts(getCopy(this.latestSeatBelt),function(err,resp){});
-				}
-            }
-            this.latestSeatBelt = null;
-        }
-    }
 
 	processAccData(data) {
 		//detect chnage in  acc_high value
@@ -1624,152 +1036,8 @@ class Device {
 			this.latestPower.start_time = data.datetime;
 			this.power_supply_time = data.datetime;
 			data.power_supply_time = data.datetime;
-			if(this.model_name == "atlanta_e101" && this.latestPower.duration > 3000){
-				this.latestPower.imei =  this.getUID();
-				this.updateBooleanReportsForPowerSupply(getCopy(this.latestPower));
-			}
-		}
-	}
-
-    processIdleDriveReport(data) {
-        if (!this.latestLocation) return;
-        if (data.ignition == 1 && data.speed > 3) {
-            if (!this.latestIdleDuration) {
-                this.latestIdleDuration = {};
-                this.latestIdleDuration.imei = this.getUID();
-                this.latestIdleDuration.datetime = data.datetime;
-                this.latestIdleDuration.extra = data.speed;
-                this.latestIdleDuration.code = 'idle';
-                this.latestIdleDuration.driver =  this.driver || this.driver_name;
-                this.latestIdleDuration.reg_no = this.reg_no;
-                this.latestIdleDuration.user_id = this.user_id;
-                this.latestIdleDuration.start = {
-                    latitude: data.lat,
-                    longitude: data.lng
-                };
-                this.latestIdleDuration.location = {
-                    lng: data.lng,
-                    course: data.course,
-                    lat: data.lat,
-                    address: this.latestLocation.address,
-                    speed: data.speed,
-                };
-                this.latestIdleDuration.prev = {
-                    latitude: data.lat,
-                    longitude: data.lng
-                };
-                this.latestIdleDuration.top_speed = data.speed;
-                this.latestIdleDuration.distance = 0;
-                this.latestIdleDuration.start_addr = this.address;
-            } else {
-                this.latestIdleDuration.distance += geozoneCalculator.getDistance(this.latestIdleDuration.prev, {
-                    latitude: data.lat,
-                    longitude: data.lng
-                });
-                this.latestIdleDuration.prev = {
-                    latitude: data.lat,
-                    longitude: data.lng
-                };
-                this.latestIdleDuration.top_speed = data.speed > this.latestIdleDuration.top_speed ? data.speed : this.latestIdleDuration.top_speed;
-				const duration = data.datetime - this.latestIdleDuration.datetime;
-				this.latestIdleDuration.duration = duration / 1000;
-				/*
-				if(parseInt(this.latestIdleDuration.duration) > 180){//duration greater than 25 seconds
-					addressService.upsertAlerts(getCopy(this.latestIdleDuration),function(err,resp){});
-					if(this.latestIdleDuration.imei == 862549046024132){
-						console.log('Idle Duration',this.latestIdleDuration.duration);
-					}
-				}
-				*/
-            }
-        } else if (this.latestIdleDuration) {
-            const duration = data.datetime - this.latestIdleDuration.datetime;
-            this.latestIdleDuration.duration = duration / 1000;
-            this.latestIdleDuration.end_time = data.datetime;
-            this.latestIdleDuration.stop = {
-                latitude: data.lat,
-                longitude: data.lng
-            };
-            this.latestIdleDuration.extra = this.latestIdleDuration.duration;
-			/*
-            if(parseInt(this.latestIdleDuration.duration) > 180){//duration greater than 25 seconds
-                addressService.upsertAlerts(getCopy(this.latestIdleDuration),function(err,resp){});
-				//emailService.sendAlertMails(getCopy(this.latestIdleDuration));
-				if(this.latestIdleDuration.imei == 862549046024132){
-					console.log('Idle Duration',this.latestIdleDuration.duration);
-				}
-            }
-			*/
-            this.latestIdleDuration = null;
-        }
-    }
-
-	processNeutralDriveReport(data) {
-		if (!this.latestLocation) return;
-		if (data.ignition == 1 && data.input_state == '6B35' && data.speed > 10) {
-			if (!this.latestNeutralDuration) {
-				this.latestNeutralDuration = {};
-				this.latestNeutralDuration.imei = this.getUID();
-				this.latestNeutralDuration.datetime = data.datetime;
-				this.latestNeutralDuration.extra = data.speed;
-				this.latestNeutralDuration.code = 'fw';
-				this.latestNeutralDuration.driver =  this.driver || this.driver_name;
-				this.latestNeutralDuration.reg_no = this.reg_no;
-				this.latestNeutralDuration.user_id = this.user_id;
-				this.latestNeutralDuration.start = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestNeutralDuration.location = {
-					lng: data.lng,
-					course: data.course,
-					lat: data.lat,
-					address: this.latestLocation.address,
-					speed: data.speed,
-				};
-				this.latestNeutralDuration.prev = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestNeutralDuration.top_speed = data.speed;
-				this.latestNeutralDuration.distance = 0;
-				this.latestNeutralDuration.start_addr = this.address;
-			} else {
-				this.latestNeutralDuration.distance += geozoneCalculator.getDistance(this.latestNeutralDuration.prev, {
-					latitude: data.lat,
-					longitude: data.lng
-				});
-				this.latestNeutralDuration.prev = {
-					latitude: data.lat,
-					longitude: data.lng
-				};
-				this.latestNeutralDuration.top_speed = data.speed > this.latestNeutralDuration.top_speed ? data.speed : this.latestNeutralDuration.top_speed;
-				const duration = data.datetime - this.latestNeutralDuration.datetime;
-				this.latestNeutralDuration.duration = duration / 1000;
-				if(parseInt(this.latestNeutralDuration.duration) > 120){//duration greater than 25 seconds
-					addressService.upsertAlerts(getCopy(this.latestNeutralDuration),function(err,resp){});
-					if(this.latestNeutralDuration.imei == 862549046024132){
-						console.log('free wheeling',this.latestNeutralDuration.duration);
-					}
-				}
-			}
-		} else if (this.latestNeutralDuration) {
-			const duration = data.datetime - this.latestNeutralDuration.datetime;
-			this.latestNeutralDuration.duration = duration / 1000;
-			this.latestNeutralDuration.end_time = data.datetime;
-			this.latestNeutralDuration.stop = {
-				latitude: data.lat,
-				longitude: data.lng
-			};
-			this.latestNeutralDuration.extra = this.latestNeutralDuration.duration;
-			if(parseInt(this.latestNeutralDuration.duration) > 120){//duration greater than 25 seconds
-				addressService.upsertAlerts(getCopy(this.latestNeutralDuration),function(err,resp){});
-				//emailService.sendAlertMails(getCopy(this.latestNeutralDuration));
-				if(this.latestNeutralDuration.imei == 862549046024132){
-					console.log('free wheeling',this.latestNeutralDuration.duration);
-				}
-			}
-			this.latestNeutralDuration = null;
+			this.latestPower.imei =  this.getUID();
+			this.updateBooleanReportsForPowerSupply(getCopy(this.latestPower));
 		}
 	}
 
@@ -1781,9 +1049,9 @@ class Device {
 			 let diffLvl =  data.f_lvl - this.f_lvl;
 			 if(diffLvl > 5){
 				 //refilling
-				 tbs.sendMessage('Fuel refilling ' + this.reg_no + " " + diffLvl);
+				 console.log('Fuel refilling ' + this.reg_no + " " + diffLvl);
 			 }else if(diffLvl < -5){
-				 tbs.sendMessage('Fuel Draining ' + this.reg_no + " " + diffLvl);
+				 console.log('Fuel Draining ' + this.reg_no + " " + diffLvl);
 			 }
 		 }
 		this.f_lvl = data.f_lvl;
@@ -1796,34 +1064,11 @@ class Device {
 			}
             cassandra.updateStatusReport(this.getUID(), false, Date.now());
             socketServer.deviceDisconnected(this.getUID());
-            //this.forceInsertData(Date.now());
             this.server.remove_device(this.getUID());
 		}else{
 			console.log('no imei on disconnect ',this.getUID());
 		}
-        /*
-        dbUtils.getAsync(database.table_device_inventory, ['ip'], {imei: this.getUID()}).then(device => {
-			device = device[0];
-			if (device.ip === externalip) {  //device did not connect to any other servers and hence is offline
-				// tbs.sendMessage(this.getUID(), 'marking offline');'
-                //console.log('making device offline ', this.getUID());
-				//cassandra.markAsOffline(this.getUID());
-				cassandra.updateStatusReport(this.getUID(), false, Date.now());
-				socketServer.deviceDisconnected(this.getUID());
-				this.forceInsertData(Date.now());
-				//this.updateBooleanReportsForOffline();
-			} else {
-                //TODO fix connections
-			    //console.log('handleDisconnection on non ip');
-				// winston.info('dev connected to another server');
-				// instruct the server to which the device connected the latest, to check for its status
-			}
-		}).catch(err => {
-		}).then(() => {
-			this.server.remove_device(this.getUID());
-		});
-		*/
-	}
+   }
 
 	forceInsertData(datetime) {
 		if (!this.latestLocation) return;
@@ -1835,22 +1080,6 @@ class Device {
 				speed: this.latestLocation.speed,
 				course: this.latestLocation.course
 			}, true);
-		}
-		/*
-		if (this.latestAccEntry) {
-			this.processAccReport({
-				datetime: datetime,
-				acc_high: !this.latestAccEntry.acc_high
-			});
-		}
-		*/
-		if (this.latestOverspeed) {
-			this.processOverspeedReport({
-				datetime: datetime,
-				lat: this.latestLocation.lat,
-				lng: this.latestLocation.lng,
-				speed: 60
-			});
 		}
 	}
 
@@ -1915,11 +1144,16 @@ class Device {
                 .then(geofence_points => {
                     if (!geofence_points) throw new Error('no geofence_points');
 					that.tripAlertSettings = [];
+					if(geofence_points && geofence_points[0] && geofence_points[0].user_id){
+						that.user_id = geofence_points[0].user_id;
+					}else{
+						console.error('no gpsId found',that.user_id);
+					}
 					//console.log('geofence_points found for trip alarm',this.user_id,this.getUID(),geofence_points.length);
                     for (let i = 0; i < geofence_points.length; i++) {
                         if (!geofence_points[i].geozone) continue;
                         geofence_points[i].ptype = 'circle';
-                        geofence_points[i].user_id = this.user_id;
+                        geofence_points[i].user_id = that.user_id;
                         geofence_points[i].imei = this.getUID();
                         delete geofence_points[i].geozone[0]._id;
 						that.tripAlertSettings.push(geofence_points[i]);
@@ -2120,14 +1354,11 @@ class Device {
             	modify.events = geofence_status;
             }
 		   if(oAlarm.geofence_type == 'TRIP' || oAlarm.geofence_type == 'Trip'){
-				console.log('geofence update in lms',oAlarm._id);
 				modify.request_id = oPing.datetime;
                 lmsDbService.updateTripGeofences(oAlarm._id,modify,function(err,resp){
-					//console.log('updateTripGeofences resp');
 					if(resp && resp.message == 'reCheckTripGeofence'){
                        that.getTripAlarms();
 					}
-					//callback(null, oAlarm);
 				});
 			}
         }else{
@@ -2190,9 +1421,6 @@ class Device {
 
 			oAlarm.device_type = this.model_name;
 			oAlarm.datetime = oPing.datetime;
-            if(this.getUID() == this.logOne){
-						console.log('findEligibleGeozones ',this.reg_no,oAlarm.name,oAlarm.entered);
-			}
            this.isGeofenceEventAsync(oAlarm, oPing).then(objAlarm => {
 				for(let i=0;i<this.alertSettings.geofence.length;i++){
 					if(this.alertSettings.geofence[i].user_id == objAlarm.user_id && this.alertSettings.geofence[i].created_at == objAlarm.created_at){
@@ -2204,18 +1432,6 @@ class Device {
 		        }
 				oAlarm = objAlarm;
 				oPing.exit = !oAlarm.entered;
-				let notification;
-				/* if (oAlarm.trip_id & oAlarm.milestone) { //trips alarm
-
-					alarmService.generateMessage(oAlarm, oAlarm.entered);
-					notification = alarmService.prepareSendFCMandSaveNotification(oAlarm, oPing, (err, res) => {
-						if (err) winston.error('geo alarm err:' + err);
-						done();
-					});
-					tripService.updateTrip(oAlarm, oPing, (err, res) => {
-						if (err) winston.error('trip update err:' + err);
-					});
-				} else if (!oAlarm.trip_id && !oAlarm.milestone) { */
                 alarmService.generateMessage(oAlarm, oAlarm.entered);
 			   let oNotif = {
 				   "include_external_user_ids": [this.user_id],
@@ -2229,68 +1445,6 @@ class Device {
 				   "name": "Geofence Alert"
 			   };
 			   oneSignalNotification.sendOneSignalNotification(oNotif);
-				if(this.getUID() == this.logOne){
-					console.log('oAlarm.entered ',this.reg_no,oAlarm.name,oAlarm.entered,oAlarm.notif_id);
-				}
-                if (oAlarm.entered) {
-					if(this.getUID() == this.logOne){
-						console.log('oAlarm.entered ',this.reg_no,oAlarm.name,oAlarm.entered);
-					}
-                    notification = alarmService.prepareSendFCMandSaveNotification(oAlarm, oPing, (err, resp) => {
-                        if (!resp[1].value) return done();
-                        oAlarm.notif_id = resp[1].value.nid;
-                        oAlarm.last_received_time = Date.now();
-                        oAlarm.notif_created_at = resp[1].value.datetime;
-                        alarmService.updateAlarm({
-								user_id: oAlarm.user_id,
-								created_at: oAlarm.created_at,
-								notif_id: oAlarm.notif_id,
-                                notif_created_at: oAlarm.notif_created_at,
-                                last_received_time : Date.now()
-						}, (err, res) => {
-						});
-							done();
-						});
-                } else {
-
-                    if (oAlarm.notif_id) {
-                        notification = alarmService.updateSendFCMandSaveNotification(oAlarm, oPing, (err, resp) => {
-                        	if(oAlarm.trip_id){
-                                oAlarm.enabled = 0;
-						    }
-                            oAlarm.last_received_time = Date.now();
-                            alarmService.updateAlarm({
-									user_id: oAlarm.user_id,
-									created_at: oAlarm.created_at,
-									notif_id: oAlarm.notif_id,
-                                    notif_created_at: oAlarm.notif_created_at,
-								    enabled : oAlarm.enabled,
-                                    last_received_time : Date.now()
-								}, (err, res) => {
-                            });
-								done();
-							});
-                    } else {
-                        notification = alarmService.prepareSendFCMandSaveNotification(oAlarm, oPing, (err, resp) => {
-                            done();
-                    });
-                    }
-                }
-
-            if (oAlarm.category === 'loading' || oAlarm.category === 'unloading') {
-                alarmService.updateDeviceInventory(oAlarm, oPing, (err, res) => {
-                    if (err) winston.error('geo alarm err:' + err);
-                });
-            }
-            if (oAlarm.trip_id) {
-                console.log(oAlarm.trip_id," entered into trip geofence ");
-                tripService.updateTrip(oAlarm, oPing, (err, res) => {
-                    if (err) winston.error('trip update err:' + err);
-                });
-            }
-            if (notification) {
-		    	socketServer.sendAlertToAllSockets(JSON.parse(JSON.stringify(notification)), this.getUID());
-            }
 		}).catch(err => {
 			if(err && err =='not geofence event'){
               //NO logging
@@ -2338,7 +1492,7 @@ class Device {
 					const alarm = {
 						imei: data.device_id || this.getUID(),
 						reg_no: this.reg_no,
-						user_id: this.user_id,
+						user_id: oAlarm.user_id || this.user_id,
 						datetime: new Date(data.datetime),
 						model_name: this.model_name,
 						location: {
@@ -2358,7 +1512,6 @@ class Device {
 					}
 					addressService.upsertAlerts(alarm, (err, resp) => {
 						if (err) {
-							tbs.sendMessage('upsertAlerts error findEligibleLmsGeozones ', err.toString());
 							console.error('upsertAlerts error', err);
 						}
 						let oNotif = {
@@ -2375,78 +1528,6 @@ class Device {
 						oneSignalNotification.sendOneSignalNotification(oNotif);
 					});
 				}
-				//end save alert
-                /*
-                let notification;
-                 if (oAlarm.trip_id & oAlarm.milestone) { //trips alarm
-
-                    alarmService.generateMessage(oAlarm, oAlarm.entered);
-                    notification = alarmService.prepareSendFCMandSaveNotification(oAlarm, oPing, (err, res) => {
-                        if (err) winston.error('geo alarm err:' + err);
-                        done();
-                    });
-                    tripService.updateTrip(oAlarm, oPing, (err, res) => {
-                        if (err) winston.error('trip update err:' + err);
-                    });
-                } else if (!oAlarm.trip_id && !oAlarm.milestone) {
-                alarmService.generateMessage(oAlarm, oAlarm.entered);
-                if (oAlarm.entered) {
-                    notification = alarmService.prepareSendFCMandSaveNotification(oAlarm, oPing, (err, resp) => {
-                        if (!resp[1].value) return done();
-                        oAlarm.notif_id = resp[1].value.nid;
-                        oAlarm.last_received_time = Date.now();
-                        oAlarm.notif_created_at = resp[1].value.datetime;
-                        alarmService.updateAlarm({
-                            user_id: oAlarm.user_id,
-                            created_at: oAlarm.created_at,
-                            notif_id: oAlarm.notif_id,
-                            notif_created_at: oAlarm.notif_created_at,
-                            last_received_time : Date.now()
-                        }, (err, res) => {
-                        });
-                        done();
-                    });
-                } else {
-
-                    if (oAlarm.notif_id) {
-                        notification = alarmService.updateSendFCMandSaveNotification(oAlarm, oPing, (err, resp) => {
-                            if(oAlarm.trip_id){
-                                oAlarm.enabled = 0;
-                            }
-                            oAlarm.last_received_time = Date.now();
-                            alarmService.updateAlarm({
-                                user_id: oAlarm.user_id,
-                                created_at: oAlarm.created_at,
-                                notif_id: oAlarm.notif_id,
-                                notif_created_at: oAlarm.notif_created_at,
-                                enabled : oAlarm.enabled,
-                                last_received_time : Date.now()
-                            }, (err, res) => {
-                            });
-                            done();
-                        });
-                    } else {
-                        notification = alarmService.prepareSendFCMandSaveNotification(oAlarm, oPing, (err, resp) => {
-                            done();
-                        });
-                    }
-                }
-
-                if (oAlarm.category === 'loading' || oAlarm.category === 'unloading') {
-                    alarmService.updateDeviceInventory(oAlarm, oPing, (err, res) => {
-                        if (err) winston.error('geo alarm err:' + err);
-                    });
-                }
-                if (oAlarm.trip_id) {
-                    console.log(oAlarm.trip_id," entered into trip geofence ");
-                    tripService.updateTrip(oAlarm, oPing, (err, res) => {
-                        if (err) winston.error('trip update err:' + err);
-                    });
-                }
-                if (notification) {
-                    socketServer.sendAlertToAllSockets(JSON.parse(JSON.stringify(notification)), this.getUID());
-                }
-                */
             }).catch(err => {
                 if(done) done();
             });
@@ -2470,7 +1551,6 @@ class Device {
 			course: data.course
 		};
 		for (let i = 0; i < this.alertSettings.over_speed.length; i++) {
-			let notification;
 			const oAlarm = this.alertSettings.over_speed[i];
 			oAlarm.device_type = this.model_name;
 			oAlarm.datetime = data.datetime;
@@ -2479,10 +1559,6 @@ class Device {
 				if (parseInt(Date.now() - this.lastOverspeed) >= 3600000 && data.speed > 50 && data.speed < 130) { //last over speed time should be more than 1 Hr.
 					oAlarm.sendSMS = true;
 					this.lastOverspeed = Date.now();
-					notification = alarmService.prepareSendFCMandSaveNotification(oAlarm, oPing, (err, res) => {
-						if (err) winston.error('geo alarm err:' + err);
-					});
-					socketServer.sendAlertToAllSockets(JSON.parse(JSON.stringify(notification)), this.getUID());
 					const alarm = {
 						code:'over_speed',
 						imei: data.device_id || this.getUID(),
@@ -2500,7 +1576,6 @@ class Device {
 					};
 					addressService.upsertAlerts(alarm, (err, resp) => {
 						if (err) {
-							tbs.sendMessage('upsertAlerts error findEligibleOverSpeeds ', err.toString());
 							console.error('upsertAlerts error', err);
 						}
 						let oNotif = {
@@ -2543,7 +1618,6 @@ class Device {
 
 		if ((device_halt_dur - s_hlt_dur) < 10) return callback();
 		if ((device_halt_dur % l_rec_dur) < 10) return callback();
-		// tbs.sendMessage(this.getUID(), 'some halt error', device_halt_dur, (Date.now() - new Date(haltAlarm.last_received_time).getTime()) / 60000);
 		callback(new Error('no event'));
 	}
 
@@ -2559,22 +1633,8 @@ class Device {
 		for (let i = 0; i < this.alertSettings.halt.length; i++) {
 			let haltAlert = this.alertSettings.halt[i];
 
-			// tbs.sendMessage(haltAlert.vehicle_no, 'detecting halt');
-
 			this.isHaltEventAsync(device_halt_dur, haltAlert).then(() => {
 				haltAlert.message = "vehicle " + haltAlert.vehicle_no + "  was stopped from last " + dateUtils.getDurationFromSecs(device_halt_dur * 60);
-				/*
-				const notification = alarmService.prepareSendFCMandSaveNotification(haltAlert, this.latestLocation, (err, respp) => {
-					if (err) {
-						winston.error('error while saving notification', err);
-					}
-				});
-				if (notification) {
-					socketServer.sendAlertToAllSockets(JSON.parse(JSON.stringify(notification)), this.getUID());
-				}
-				*/
-				//one signal starts
-				console.log(haltAlert.message);
 				let alarm = {
 					imei: haltAlert.imei || that.getUID(),
 					reg_no: that.reg_no,
@@ -2596,7 +1656,6 @@ class Device {
 					};
 					addressService.upsertAlerts(alarm, (err, resp) => {
 						if (err) {
-							tbs.sendMessage('upsertAlerts error', err.toString());
 							console.error('upsertAlerts error', err);
 						}
 						let oNotif = {
@@ -2670,20 +1729,10 @@ class Device {
             }
             return deviceService.processADASReportV2Async(das);
         }).then(function (res) {
-		/*cassandra.getAggregatedDASAsync(imei, dateUtils.getMorning(new Date()).getTime(), Date.now()).then(function (das) {
-			for (let i = 0; i < das.length; i++) {
-				if ((das[i].distance / das[i].duration * 3.6 > 160) || (das[i].distance / das[i].duration * 3.6 < 2)) {
-					das[i].distance = 0;
-					das[i].drive = false;
-				}
-			}
-			return deviceService.processADASReportAsync(das);
-		}).then(function (res) { */
 			res = res[imei];
 
 			done(null, res.tot_dist);
 		}).catch(function (err) {
-			// winston.info(imei, err);
 			done(err);
 		});
 	}
@@ -2747,15 +1796,6 @@ class Device {
 	}
 
 	updateBooleanReportsForPowerSupply(data) {
-		console.log('updateBooleanReportsForPowerSupply ');
-		dbUtils.update(database.table_report_boolean, {
-				imei: data.imei || this.getUID(),
-				datetime: data.start_time,
-				type: 'power',
-				value:data.power_supply,
-				online:true,
-				duration:data.duration
-			});
 		const alarm = {
 			imei: data.imei || this.getUID(),
 			reg_no: this.reg_no,
@@ -2763,12 +1803,15 @@ class Device {
 			datetime: new Date(),
 			model_name: this.model_name
 		};
-		if(data.power_supply){
+		if(data.power_supply == true){
 			alarm.code = 'power_connect';
 			alarm.msg = alarms['power_connect']
-		}else{
+		}else if(data.power_supply == false){
 			alarm.code = 'power_cut';
-			alarm.msg = alarms['power_cut']
+			alarm.msg = alarms['power_cut'];
+		}else{
+			console.error('no power supply value');
+			return;
 		}
 
 		if (this.latestLocation) {
@@ -2784,9 +1827,20 @@ class Device {
 		}
 		addressService.upsertAlerts(alarm, (err, resp) => {
 			if (err) {
-				tbs.sendMessage('upsertAlerts error updateBooleanReportsForPowerSupply ', err.toString());
 				console.error('upsertAlerts error', err);
 			}
+			let oNotif = {
+				"include_external_user_ids": [alarm.user_id],
+				"contents": {
+					"en": alarm.msg
+				},
+				"data": {
+					reg_no: alarm.reg_no,
+					user_id: alarm.user_id,
+				},
+				"name": alarm.code
+			};
+			oneSignalNotification.sendOneSignalNotification(oNotif);
 		});
 	}
 
@@ -2798,41 +1852,6 @@ class Device {
 	getInfo() {
 		return this.model_name + '[' + this.getUID() + '] ';
 	}
-
-	validateAcceleration(alarm,callback){
-		let start_time = new Date(alarm.datetime);
-		start_time.setMinutes(new Date(alarm.datetime).getMinutes() - 3);
-		let bValidAcc = false;
-		cassandra.getGpsDataBetweenTimeAsync(alarm.imei,start_time, alarm.datetime).then(function (das) {
-           if(das && das.length){
-              for(let s=1;s<das.length;s++){
-				  let dur = das[s].datetime - das[s-1].datetime;
-				  dur = dur/1000;
-				  dur = Math.abs(dur);
-				  console.log(dur,das[s].speed,new Date(das[s].datetime));
-              	if(dur > 0 && dur < 30){//30 sec
-              	  let acceleration = (das[s].speed - das[s-1].speed)/dur;
-					acceleration = Math.abs(acceleration);
-					console.log('acceleration',acceleration);
-              	  if(acceleration > 4){
-					  bValidAcc =  true;
-					  break;
-				  }
-				}
-			  }
-              //return bValidAcc;
-              callback(null,bValidAcc);
-		   }else {
-			   //return bValidAcc;
-			   callback(null,bValidAcc);
-          }
-		}).catch(function (err) {
-			console.error('ha hb alarm error ', err);
-			//return bValidAcc;
-			callback(err,bValidAcc);
-		});
-	}
-
 }
 
 module.exports = Device;

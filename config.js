@@ -1,7 +1,3 @@
-/**
- * Updated by Kamal on 13-08-2020.
- */
-
 process.env.NODE_CONFIG_DIR = __dirname + '/config';
 
 const config = require('config');
