@@ -1152,7 +1152,11 @@ class Device {
 					//console.log('geofence_points found for trip alarm',this.user_id,this.getUID(),geofence_points.length);
                     for (let i = 0; i < geofence_points.length; i++) {
                         if (!geofence_points[i].geozone) continue;
-                        geofence_points[i].ptype = 'circle';
+						if(geofence_points[i].geozone.length > 2){
+							geofence_points[i].ptype = geofence_points[i].ptype || 'polygon';
+						}else{
+							geofence_points[i].ptype = geofence_points[i].ptype || 'circle';
+						}
                         geofence_points[i].user_id = that.user_id;
                         geofence_points[i].imei = this.getUID();
                         delete geofence_points[i].geozone[0]._id;
@@ -1607,7 +1611,8 @@ class Device {
 
 	isHaltEvent(device_halt_dur, haltAlarm, callback) {
 		let s_hlt_dur, l_rec_dur;
-		if (haltAlarm.halt_duration) {
+		//halt setting should be more than 1 hr
+		if (haltAlarm.halt_duration && haltAlarm.halt_duration> 60) {
 			s_hlt_dur = haltAlarm.halt_duration;
 			l_rec_dur = 60;  // 1 hr
 		} else {
@@ -1685,6 +1690,23 @@ class Device {
 					if (err) {
 						winston.error("error while updating halt alarm settings", err.toString());
 					}
+				});
+				addressService.upsertAlerts(alarm, (err, resp) => {
+					if (err) {
+						console.error('upsertAlerts error', err);
+					}
+					let oNotif = {
+						"include_external_user_ids": [that.user_id],
+						"contents": {
+							"en": alarm.msg
+						},
+						"data": {
+							reg_no: that.reg_no,
+							user_id: that.user_id,
+						},
+						"name": "Halt Alert"
+					};
+					oneSignalNotification.sendOneSignalNotification(oNotif);
 				});
 			}).catch(err => {
 					//console.error('findEligibleHalts error',err);

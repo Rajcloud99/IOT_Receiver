@@ -56,7 +56,7 @@ exports.getGpsDataBetweenTimeAsync = function (imei, start, end) {
 };
 
 exports.getGpsDataBetweenTime = function (imei, start, end, callback) {
-	const query = 'SELECT latitude, longitude, speed ,datetime, inserted, gps_tracking, device_id,ignition FROM ' + database.table_gps_data + ' WHERE device_id = ? AND datetime >= ? AND datetime <= ? order by datetime ASC ALLOW FILTERING';
+	const query = 'SELECT latitude, longitude, speed ,datetime, inserted, gps_tracking, device_id,ignition,f_lvl,fl FROM ' + database.table_gps_data + ' WHERE device_id = ? AND datetime >= ? AND datetime <= ? order by datetime ASC ALLOW FILTERING';
     const options = { prepare : true , fetchSize : 1000 };
     let gpsData = [];
     cassandraDbInstance.eachRow(query, [imei, start, end], options, function (n, row) {
