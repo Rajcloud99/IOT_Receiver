@@ -4,7 +4,6 @@ module.exports.insertdData = async function (data) {
     if(data && (logOne == data.device_id)){
         console.log('ping from logOne',data);
     }
-    console.log('ping from logOne',data.device_id);
     const oSave = {
         ...data,
         location: {
@@ -22,6 +21,5 @@ module.exports.insertdData = async function (data) {
                     gpsData: oSave
                 }
             });
-        console.log('oUpdate on sync',oUpdate);
     }
 };
