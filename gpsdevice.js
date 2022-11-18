@@ -315,9 +315,10 @@ class Device {
 								if(this.latestLocation){
 									this.latestLocation.pingToLMS = new Date();
 								}
-								lmsSocketServer.sendPingToAllLmsSockets(JSON.parse(JSON.stringify(gps_data)), this.acc_high, cb);
 								if(lmsDBSyncService && config.syncMongoDB && config.syncMongoDB.lms){
 								   lmsDBSyncService.insertdData(JSON.parse(JSON.stringify(gps_data)));
+								}else{
+									lmsSocketServer.sendPingToAllLmsSockets(JSON.parse(JSON.stringify(gps_data)), this.acc_high, cb);
 								}
 							}else if(this.latestLocation && ( condC1 || lmsPingInt > 10)){//min
 								if(this.latestLocation){
