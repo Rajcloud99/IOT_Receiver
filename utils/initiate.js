@@ -63,3 +63,8 @@ const connJob = new CronJob({
 if (config.isProductionServer || config.isTestServer) reportServer.startDailyJob();
 
 if (config.isProductionServer || config.isTestServer) reportServer.startSetDistCurrentJob();
+
+if(config.syncMongoDB && config.syncMongoDB.lms){
+	const lmsServer = require('../servers/lmsServer');
+	lmsServer.initializeDB();
+}
