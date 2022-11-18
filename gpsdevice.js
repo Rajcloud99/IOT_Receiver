@@ -316,7 +316,7 @@ class Device {
 									this.latestLocation.pingToLMS = new Date();
 								}
 								lmsSocketServer.sendPingToAllLmsSockets(JSON.parse(JSON.stringify(gps_data)), this.acc_high, cb);
-								if(config.syncMongoDB && config.syncMongoDB.lms){
+								if(lmsDBSyncService && config.syncMongoDB && config.syncMongoDB.lms){
 								   lmsDBSyncService.insertdData(JSON.parse(JSON.stringify(gps_data)));
 								}
 							}else if(this.latestLocation && ( condC1 || lmsPingInt > 10)){//min
