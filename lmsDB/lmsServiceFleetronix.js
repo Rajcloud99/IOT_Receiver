@@ -4,7 +4,7 @@ module.exports.insertdData = async function (data) {
     if(data && (logOne == data.device_id)){
         console.log('ping from logOne',data);
     }
-    console.log('ping from logOne',data);
+    console.log('ping from logOne',data.device_id);
     const oSave = {
         ...data,
         location: {
@@ -14,7 +14,7 @@ module.exports.insertdData = async function (data) {
         vendor_code: '00'
     };
     if (data.lng && data.lat) {
-          await RegisteredVehicle.updateMany({device_imei: data.device_id}, {
+        let oUpdate = await RegisteredVehicle.updateMany({device_imei: data.device_id}, {
                 $set: {
                     device_type:data.model_name,
                     odometer: data.odo,
@@ -22,5 +22,6 @@ module.exports.insertdData = async function (data) {
                     gpsData: oSave
                 }
             });
+        console.log('oUpdate on sync',oUpdate);
     }
 };
