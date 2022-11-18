@@ -2,11 +2,13 @@
   "syncMongoDB": {
     "lms": {
       "name": "Fleetronix",
-      "host": "13.235.119.20",
-      "port": 27017,
-      "user": "testserver",
-      "password": "test1234",
+      "host": "43.205.189.162",
+      "port": "27017",
+      "user": "fleetronixdb",
+      "password": "a2bwc47623",
       "db": "lmsDB"
     }
   }
 }
+
+
