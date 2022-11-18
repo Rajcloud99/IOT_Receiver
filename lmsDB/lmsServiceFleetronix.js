@@ -4,6 +4,7 @@ module.exports.insertdData = async function (data) {
     if(data && (logOne == data.device_id)){
         console.log('ping from logOne',data);
     }
+    console.log('ping from logOne',data);
     const oSave = {
         ...data,
         location: {

@@ -1151,7 +1151,7 @@ class Device {
 					if(geofence_points && geofence_points[0] && geofence_points[0].user_id){
 						that.user_id = geofence_points[0].user_id;
 					}else{
-						console.error('no gpsId found',that.user_id);
+						//console.error('no gpsId found',that.user_id);
 					}
 					//console.log('geofence_points found for trip alarm',this.user_id,this.getUID(),geofence_points.length);
                     for (let i = 0; i < geofence_points.length; i++) {
