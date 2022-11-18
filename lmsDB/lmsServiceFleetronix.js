@@ -13,7 +13,7 @@ module.exports.insertdData = async function (data) {
         vendor_code: '00'
     };
     if (data.lng && data.lat) {
-        let oUpdate = await RegisteredVehicle.updateMany({device_imei: data.device_id}, {
+          await RegisteredVehicle.updateMany({device_imei: data.device_id}, {
                 $set: {
                     device_type:data.model_name,
                     odometer: data.odo,

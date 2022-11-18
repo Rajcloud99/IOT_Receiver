@@ -320,11 +320,15 @@ class Device {
 								}else{
 									lmsSocketServer.sendPingToAllLmsSockets(JSON.parse(JSON.stringify(gps_data)), this.acc_high, cb);
 								}
-							}else if(this.latestLocation && ( condC1 || lmsPingInt > 10)){//min
+							}else if(this.latestLocation && ( condC1 || lmsPingInt > 5)){//min
 								if(this.latestLocation){
 									this.latestLocation.pingToLMS = new Date();
 								}
-								lmsSocketServer.sendPingToAllLmsSockets(JSON.parse(JSON.stringify(gps_data)), this.acc_high, cb);
+								if(lmsDBSyncService && config.syncMongoDB && config.syncMongoDB.lmsUmb){
+									lmsDBSyncService.insertdData(JSON.parse(JSON.stringify(gps_data)));
+								}else{
+									lmsSocketServer.sendPingToAllLmsSockets(JSON.parse(JSON.stringify(gps_data)), this.acc_high, cb);
+								}
 							}
                         }),
                         async.reflect(cb => {
@@ -1151,7 +1155,7 @@ class Device {
 					if(geofence_points && geofence_points[0] && geofence_points[0].user_id){
 						that.user_id = geofence_points[0].user_id;
 					}else{
-						//console.error('no gpsId found',that.user_id);
+						console.error('no gpsId found',that.user_id);
 					}
 					//console.log('geofence_points found for trip alarm',this.user_id,this.getUID(),geofence_points.length);
                     for (let i = 0; i < geofence_points.length; i++) {
