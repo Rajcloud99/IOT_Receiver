@@ -1046,6 +1046,9 @@ class Device {
 			data.power_supply_time = data.datetime;
 			this.latestPower.imei =  this.getUID();
 			this.updateBooleanReportsForPowerSupply(getCopy(this.latestPower));
+		}else{
+			this.latestPower.power_supply = data.power_supply;//
+			this.power_supply = data.power_supply;
 		}
 	}
 
