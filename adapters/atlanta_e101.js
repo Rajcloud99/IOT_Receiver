@@ -54,8 +54,8 @@ class adapter{
             parts.action = "ping";
             parts.packat_type = "01";
         }
-        if(this.device.getUID() == this.device.logOne) {
-            fs.appendFile('atlanta_e101-'+this.device.getUID()+'.txt', new Date() + ' : ' + parts.org  + '\n', function (err) {});
+        if(this.device.getUID() == this.device.logOne  && this.device.logFile) {
+            fs.appendFile(this.device.model_name+'-'+this.device.getUID()+'.txt', new Date() + ' : ' + parts.org  + '\n', function (err) {});
         }
         return parts;
     }
@@ -64,6 +64,9 @@ class adapter{
         try{
             const str = msg_parts.data;
             let oInputStatus =  this.getInputDeatils(str[14]);
+            if(this.device.getUID() == this.device.logOne  && this.device.logFile) {
+                fs.appendFile('atlanta_e101-'+this.device.getUID()+'.txt', new Date() + ' oInputStatus.power_supply : ' + oInputStatus.power_supply  + '\n', function (err) {});
+            }
             const data = {
                 device_id: this.device.getUID() || msg_parts.device_id,
                 validity:str[3] == 'A',
@@ -139,8 +142,10 @@ class adapter{
     getInputDeatils(strAlert){
         let oAlert= {};
         if(!strAlert || strAlert.length < 12){
-           // console.log('wrong alerts string',strAlert);
             return oAlert;
+        }
+        if(this.device.getUID() == this.device.logOne  && this.device.logFile) {
+            fs.appendFile('atlanta_e101-'+this.device.getUID()+'.txt', new Date() + '  getInputDeatils for strAlert : ' + strAlert  + '\n', function (err) {});
         }
         oAlert.ignition = strAlert.substr(1,1);
         oAlert.door = strAlert.substr(2,1);

@@ -20,6 +20,7 @@ const emailService = require('./services/emailService');
 const PointInPolygon = require('./utils/pointInsidePolygoan');
 const setDistToCurrent = require('./scripts/setDistToCurrent');
 const oneSignalNotification = require('./utils/onseSignalNotification');
+const fs = require("fs");
 /*************************************************************
 
  THE DEVICE CLASS
@@ -55,6 +56,12 @@ class Device {
 			this.logOne = 357073295741991
 		}else{
 			this.logOne = config.logOne;
+		}
+
+		if(config.logFile){
+			this.logFile = config.logFile;
+		}else{
+			this.logFile = false;
 		}
 
 		this.endListener = () => {
@@ -139,18 +146,22 @@ class Device {
 		}
 
 		if (!this.getUID()) {
-			this.setUID(msg_parts.device_id);
-			if (this.server.find_device(this.getUID())) {
+			// tbs.sendMessage(this.getUID(), 'connected');
+			let oldDeviceConn = this.server.find_device(msg_parts.device_id);
+            if (oldDeviceConn) {
             	if(this.logOne){
-            		let oldDeviceConn = this.server.find_device(this.getUID());
-            		if(oldDeviceConn.latestLocation && oldDeviceConn.latestLocation.datetime){
+                   if(oldDeviceConn.latestLocation && oldDeviceConn.latestLocation.datetime){
             			//console.log(this.getUID(), this.model_name, ' time difference in sec',(new Date().getTime() - new Date(oldDeviceConn.latestLocation.datetime).getTime())/1000);
 					}
-					if(this.getUID() == this.logOne){
-						console.log('overriding connection for ',this.getUID(),this.model_name);
+					if(msg_parts.device_id == this.logOne){
+						console.log('overriding connection for ',msg_parts.device_id,this.model_name);
+						if(this.logFile){
+							fs.appendFile(this.model_name + '-' + msg_parts.device_id+'.txt', new Date() + '  overriding connection for : ' + msg_parts.device_id  + '\n', function (err) {});
+						}
 					}
 				}
 
+				this.setUID(msg_parts.device_id);
 				this.detachConnectionListeners();
 				this.server.find_device(this.getUID()).detachConnectionListeners();
 				this.server.find_device(this.getUID()).connection.destroy();
@@ -159,6 +170,7 @@ class Device {
 				this.server.find_device(this.getUID()).make_action(msg_parts.action, msg_parts);
 				return;
 			}
+			this.setUID(msg_parts.device_id);
 		}
 
 		/************************************
@@ -190,6 +202,11 @@ class Device {
 		if (action !== "login_request" && !this.loged) {
 			this.adapter.request_login_to_device(msg_parts);
 			// winston.error(this.model_name, this.getUID(),  " is trying to '" + action + "' but it isn't logged in. Action wasn't executed");
+			if(this.getUID() == this.logOne) {
+				if(this.logFile){
+					fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  login_request sent but action was : ' + action  + '\n', function (err) {});
+				}
+			}
 			return false;
 		}
 		switch (action) {
@@ -227,8 +244,15 @@ class Device {
 		// var existingDevice = servers[options.type].find_device(device_id);   Handle this properly later
 
 		this.server.add_device(this);
-		this.getAlarms();
-		cassandra.insertServerIpAndStatus(this.getUID(), externalip, this.port, this.model_name);
+		setTimeout(() => {
+			this.getAlarms();
+            //this.updateDistanceToday();
+			cassandra.insertServerIpAndStatus(this.getUID(), externalip, this.port, this.model_name);
+			this.updateStatus(msg_parts);
+		}, genUtils.getRandomIntInclusive(0, 6000));
+
+		socketServer.deviceConnected(this.getUID());
+     	// winston.info(this.model_name + ' TOTAL CONNECTED DEVICES: ' + this.server.getNumOfActiveConnections());
 	}
 
 	login_authorized(val, msg_parts) {
@@ -242,6 +266,11 @@ class Device {
 	 RECEIVING GPS POSITION FROM THE DEVICE
 	 ****************************************/
 	ping(data, isParsed, callback) {
+		if(this.getUID() == this.logOne) {
+			if(this.logFile){
+				fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  Ping from device this.processingPing : ' + this.processingPing  + '\n', function (err) {});
+			}
+		}
 		if (this.processingPing){
 			//TODO make some process async to avoid loss of packets
 			//console.log('already processing',this.getUID(),this.model_name);
@@ -256,11 +285,22 @@ class Device {
 
 	handlePing(data, isParsed, callback) {
 		const gps_data = isParsed ? data : this.adapter.get_ping_data(data);
-		if(this.getUID() == this.logOne){
+		if(this.getUID() == this.logOne) {
 			console.log('ping from ',this.reg_no,this.getUID(),gps_data.fl,gps_data.f_lvl);
+			if(this.logFile){
+				fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  Ping before validateGpsData : ' + new Date(gps_data.datetime)  + '\n', function (err) {});
+			}
 		}
 		if (!gps_data || !this.validateGpsData(gps_data)) {
 			if (this.logAll || this.getUID() === this.logOne) winston.info("GPS Data can't be parsed. Discarding packet...");
+			if(this.getUID() == this.logOne) {
+				console.error(new Date(),'GPS Data can not be parsed  ');
+				if(this.logFile){
+					fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  GPS Data can not be parsed : ' + JSON.stringify(gps_data)  + '\n', function (err) {});
+				}
+			}
+			cassandra.insertServerIpAndStatus(this.getUID(), externalip, this.port, this.model_name);
+			this.updateStatus(gps_data);
 			callback('invalid data');
 			return;
 		}
@@ -280,7 +320,13 @@ class Device {
 
 		], (err, res) => {
 			if (err) {
-				if (this.logAll || this.getUID() === this.logOne) winston.error('parallel error '+ this.getUID(), err.stack);
+				if (this.logAll) winston.error('parallel error '+ this.getUID(), err.stack);
+				if(this.getUID() == this.logOne) {
+					console.error(new Date(),'parallel error  ',err.message);
+					if(this.logFile){
+						fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  parallel error : ' + err.message  + '\n', function (err) {});
+					}
+				}
 				callback(err);
 				return;
 			}
@@ -336,7 +382,13 @@ class Device {
                         })
                     ], (err, res) => {
 						if(err){
-							console.log('error in process ping data sync',err.message);
+							if(this.getUID() == this.logOne) {
+								console.error(new Date(),'async.parallel error  ',err.message);
+								if(this.logFile){
+									fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  async.parallel error : ' + err.message  + '\n', function (err) {});
+								}
+							}
+							console.log('error in process ping data sync to other servers',err.message);
 						}
 						callback();
                     });
@@ -344,10 +396,41 @@ class Device {
 			}).catch(err => {
 				if(err!='old data') {
 					//console.error('on processPingDataAsync '+gps_data.device_id ,err);
+					if(this.getUID() == this.logOne) {
+						console.error(new Date(),'processPingDataAsync catch error  ',err.message);
+						if(this.logFile){
+							fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + ' processPingDataAsync catch error : ' + err.message || err  + '\n', function (err) {});
+						}
+					}
 				}
 				callback(err);
 			});
 		});
+	}
+
+	updateStatus(gps_data){
+		if(!this || !gps_data){
+			console.error("this not defined",gps_data);
+			return;
+		}
+		gps_data.user_id = this.user_id;
+		gps_data.model_name = this.model_name;
+		gps_data.aGpsgaadi = this.aGpsgaadi;
+		if(this.getUID() == this.logOne) {
+			console.error(new Date(),' Update status in mongo  ');
+			if(this.logFile){
+				fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + ' Update status in mongo : ' + JSON.stringify(gps_data)  + '\n', function (err) {});
+			}
+		}
+		if(config.lms && config.lms.syncForAll){
+			if(lmsDBSyncService && config.syncMongoDB && config.syncMongoDB.lms){
+				lmsDBSyncService.insertdDataStatus(JSON.parse(JSON.stringify(gps_data)));
+			}
+		}else{
+			if(lmsDBSyncService && config.syncMongoDB && config.syncMongoDB.lmsUmb){
+				lmsDBSyncService.insertdDataStatus(JSON.parse(JSON.stringify(gps_data)));
+			}
+		}
 	}
 
 	validateGpsData(gps_data) {
@@ -419,6 +502,12 @@ class Device {
 					this.acc_high = device.acc_high;
 					this.acc_high_time = new Date(device.acc_high_time || new Date()).getTime(); 
 				}
+				if(this.getUID() == this.logOne) {
+					console.log('initiateLatestLocationIfStopped from ',this.reg_no,this.getUID());
+					if(this.logFile){
+						fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  initiateLatestLocationIfStopped device.power_supply : ' + device.power_supply  + '\n', function (err) {});
+					}
+				}
 				if(device.power_supply == true || device.power_supply == false){//avoid null and undefined valued
 					this.latestPower = {
 						power_supply : device.power_supply,
@@ -426,7 +515,12 @@ class Device {
 					};
 					this.power_supply = device.power_supply;
 					this.power_supply_time = new Date(device.power_supply_time || new Date()).getTime();
-
+					if(this.getUID() == this.logOne) {
+						console.log('latestPower from ',this.reg_no,this.getUID());
+						if(this.logFile){
+							fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  latestPower latestPower.power_supply : ' + this.latestPower.power_supply  + '\n', function (err) {});
+						}
+					}
 				}
 				if(device.sens_fl){
 					this.fuel_sensor_m_fact = device.sens_fl;
@@ -462,12 +556,14 @@ class Device {
 				}
 				//last halt processing end
 
-				if(this.getUID() == this.logOne){
-					console.log('initiateLatestLocationIfStopped from',this.reg_no,this.getUID(),this.user_id,this.model_name);
-				}
 			})
 			.catch(err => {
 				console.error('initiateLatestLocationIfStopped catch ',err.message);
+				if(this.getUID() == this.logOne) {
+					if(this.logFile){
+						fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  initiateLatestLocationIfStopped catch error : ' + err.message  + '\n', function (err) {});
+					}
+				}
 			})
 			.then(() => {
 				callback();
@@ -491,6 +587,12 @@ class Device {
 				this.aGpsgaadi = aGpsgaadi;
 			})
 			.catch(err => {
+				if(this.getUID() == this.logOne) {
+					console.log('fetchUserDetails from ',this.reg_no,this.getUID());
+					if(this.logFile){
+						fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  fetchUserDetails error : ' + err.message  + '\n', function (err) {});
+					}
+				}
 			})
 			.then(() => {
 				callback();
@@ -525,14 +627,23 @@ class Device {
 		}
 
 		if (gps_data.datetime < this.lastLocationTime) { //Ignore old data as it will break our reports TODO = check
-			//console.log('old data ',this.getUID(),new Date(gps_data.datetime));
 			if (this.logAll || this.getUID() === this.logOne) winston.error('old data ' + this.getUID() , new Date(gps_data.datetime).toLocaleString(), '<', new Date(this.lastLocationTime).toLocaleString());
+			if(this.getUID() == this.logOne) {
+				console.error(new Date(),' old data after insert  ',this.getUID(),this.model_name);
+				if(this.logFile){
+					fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + ' old data after insert : ' + new Date(gps_data.datetime).toLocaleString()  + '\n', function (err) {});
+				}
+			}
+			//TODO handle connection here
+			//console.error('old data after insert ' + this.getUID() + this.model_name , new Date(gps_data.datetime).toLocaleString(), '<', new Date(this.lastLocationTime).toLocaleString());
+			cassandra.insertServerIpAndStatus(this.getUID(), externalip, this.port, this.model_name);
+			this.updateStatus(gps_data);
 			callback('old data');
 			return;
 		}
 
 		this.lastLocationTime = gps_data.datetime;
-		gps_data.positioning_time = gps_data.datetime;
+		gps_data.positioning_time = Date.now();
 
 		if (this.latestLocation) {
             gps_data.pingToLMS = this.latestLocation.pingToLMS;
@@ -554,6 +665,12 @@ class Device {
 			if (dur > 0 && dist / dur * 3.6 > 160) {
 				this.latestLocation = null;
 				if (this.logAll || this.getUID() === this.logOne) winston.error('invalid data');
+				if(this.getUID() == this.logOne) {
+					console.error(new Date(),' invalid data for speed  ');
+					if(this.logFile){
+						fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + ' invalid data for speed : ' + new Date(gps_data.datetime).toLocaleString()  + '\n', function (err) {});
+					}
+				}
 				callback('invalid data for speed');
 				return;
 			}
@@ -605,6 +722,11 @@ class Device {
 		}
 
 		//current power supply processing
+		if(this.getUID() == this.logOne) {
+			if(this.logFile){
+				fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  before processPowerSupplyData : ' + gps_data.power_supply  + '\n', function (err) {});
+			}
+		}
 		if(gps_data.power_supply == true || gps_data.power_supply == false ){
 			this.processPowerSupplyData(gps_data);
 		}
@@ -898,6 +1020,13 @@ class Device {
                 that.lastAddrTime = Date.now();
                 callback();
             }).catch(err => {
+                // tbs.sendMessage('aws addr fetch err', err);
+				if(this.getUID() == this.logOne) {
+					console.log('fetchAddressIfRequired from ',this.reg_no,this.getUID());
+					if(this.logFile){
+						fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  fetchAddressIfRequired error : ' + err.message  + '\n', function (err) {});
+					}
+				}
                 callback(err);
             });
         }
@@ -1020,7 +1149,15 @@ class Device {
 
 	processPowerSupplyData(data) {
 		//detect chnage in  power_supply value
-		if (!this.latestLocation) return;
+		if (!this.latestLocation) {
+			if(this.getUID() == this.logOne) {
+				if (this.logFile) {
+					fs.appendFile(this.model_name + '-' + this.getUID() + '.txt', new Date() + '  no latest location processPowerSupplyData : ' + data.power_supply + '\n', function (err) {
+					});
+				}
+			}
+			return;
+		}
 		if (!this.latestPower) {
 			this.latestPower = {};
 			if(this.power_supply == true || this.power_supply == false){
@@ -1036,19 +1173,178 @@ class Device {
 					this.latestPower.start_time = data.datetime;
 				}
 			}
-		} else if ((this.power_supply == true || this.power_supply == false ) && (this.latestPower.power_supply !== data.power_supply)) {
+		} else if ((this.power_supply == true || this.power_supply == false ) && (this.latestPower.power_supply != data.power_supply)) {
 			const duration = data.datetime - this.latestPower.start_time;
 			this.latestPower.duration = duration / 1000;
 			this.latestPower.end_time = data.datetime;
 			this.power_supply = data.power_supply;//initialize
+
 			this.latestPower.start_time = data.datetime;
 			this.power_supply_time = data.datetime;
 			data.power_supply_time = data.datetime;
 			this.latestPower.imei =  this.getUID();
-			//this.updateBooleanReportsForPowerSupply(getCopy(this.latestPower));
+			if(this.getUID() == this.logOne) {
+				if (this.logFile) {
+					fs.appendFile(this.model_name + '-' + this.getUID() + '.txt', new Date() + '  updateBooleanReportsForPowerSupply : ' + data.power_supply + ' latestPower '+this.latestPower.power_supply + '\n', function (err){
+
+					});
+				}
+			}
+			this.updateBooleanReportsForPowerSupply(getCopy(this.latestPower));
+			this.latestPower.power_supply = data.power_supply;
 		}else{
-			this.latestPower.power_supply = data.power_supply;//
+			if(this.getUID() == this.logOne) {
+				if (this.logFile) {
+					fs.appendFile(this.model_name + '-' + this.getUID() + '.txt', new Date() + '  no change in power supply : ' + data.power_supply + ' latestPower '+this.latestPower.power_supply + '\n', function (err){
+
+					});
+				}
+			}
+			this.latestPower.power_supply = data.power_supply;
 			this.power_supply = data.power_supply;
+
+		}
+	}
+
+    processIdleDriveReport(data) {
+        if (!this.latestLocation) return;
+        if (data.ignition == 1 && data.speed > 3) {
+            if (!this.latestIdleDuration) {
+                this.latestIdleDuration = {};
+                this.latestIdleDuration.imei = this.getUID();
+                this.latestIdleDuration.datetime = data.datetime;
+                this.latestIdleDuration.extra = data.speed;
+                this.latestIdleDuration.code = 'idle';
+                this.latestIdleDuration.driver =  this.driver || this.driver_name;
+                this.latestIdleDuration.reg_no = this.reg_no;
+                this.latestIdleDuration.user_id = this.user_id;
+                this.latestIdleDuration.start = {
+                    latitude: data.lat,
+                    longitude: data.lng
+                };
+                this.latestIdleDuration.location = {
+                    lng: data.lng,
+                    course: data.course,
+                    lat: data.lat,
+                    address: this.latestLocation.address,
+                    speed: data.speed,
+                };
+                this.latestIdleDuration.prev = {
+                    latitude: data.lat,
+                    longitude: data.lng
+                };
+                this.latestIdleDuration.top_speed = data.speed;
+                this.latestIdleDuration.distance = 0;
+                this.latestIdleDuration.start_addr = this.address;
+            } else {
+                this.latestIdleDuration.distance += geozoneCalculator.getDistance(this.latestIdleDuration.prev, {
+                    latitude: data.lat,
+                    longitude: data.lng
+                });
+                this.latestIdleDuration.prev = {
+                    latitude: data.lat,
+                    longitude: data.lng
+                };
+                this.latestIdleDuration.top_speed = data.speed > this.latestIdleDuration.top_speed ? data.speed : this.latestIdleDuration.top_speed;
+				const duration = data.datetime - this.latestIdleDuration.datetime;
+				this.latestIdleDuration.duration = duration / 1000;
+				/*
+				if(parseInt(this.latestIdleDuration.duration) > 180){//duration greater than 25 seconds
+					addressService.upsertAlerts(getCopy(this.latestIdleDuration),function(err,resp){});
+					if(this.latestIdleDuration.imei == 862549046024132){
+						console.log('Idle Duration',this.latestIdleDuration.duration);
+					}
+				}
+				*/
+            }
+        } else if (this.latestIdleDuration) {
+            const duration = data.datetime - this.latestIdleDuration.datetime;
+            this.latestIdleDuration.duration = duration / 1000;
+            this.latestIdleDuration.end_time = data.datetime;
+            this.latestIdleDuration.stop = {
+                latitude: data.lat,
+                longitude: data.lng
+            };
+            this.latestIdleDuration.extra = this.latestIdleDuration.duration;
+			/*
+            if(parseInt(this.latestIdleDuration.duration) > 180){//duration greater than 25 seconds
+                addressService.upsertAlerts(getCopy(this.latestIdleDuration),function(err,resp){});
+				//emailService.sendAlertMails(getCopy(this.latestIdleDuration));
+				if(this.latestIdleDuration.imei == 862549046024132){
+					console.log('Idle Duration',this.latestIdleDuration.duration);
+				}
+            }
+			*/
+            this.latestIdleDuration = null;
+        }
+    }
+
+	processNeutralDriveReport(data) {
+		if (!this.latestLocation) return;
+		if (data.ignition == 1 && data.input_state == '6B35' && data.speed > 10) {
+			if (!this.latestNeutralDuration) {
+				this.latestNeutralDuration = {};
+				this.latestNeutralDuration.imei = this.getUID();
+				this.latestNeutralDuration.datetime = data.datetime;
+				this.latestNeutralDuration.extra = data.speed;
+				this.latestNeutralDuration.code = 'fw';
+				this.latestNeutralDuration.driver =  this.driver || this.driver_name;
+				this.latestNeutralDuration.reg_no = this.reg_no;
+				this.latestNeutralDuration.user_id = this.user_id;
+				this.latestNeutralDuration.start = {
+					latitude: data.lat,
+					longitude: data.lng
+				};
+				this.latestNeutralDuration.location = {
+					lng: data.lng,
+					course: data.course,
+					lat: data.lat,
+					address: this.latestLocation.address,
+					speed: data.speed,
+				};
+				this.latestNeutralDuration.prev = {
+					latitude: data.lat,
+					longitude: data.lng
+				};
+				this.latestNeutralDuration.top_speed = data.speed;
+				this.latestNeutralDuration.distance = 0;
+				this.latestNeutralDuration.start_addr = this.address;
+			} else {
+				this.latestNeutralDuration.distance += geozoneCalculator.getDistance(this.latestNeutralDuration.prev, {
+					latitude: data.lat,
+					longitude: data.lng
+				});
+				this.latestNeutralDuration.prev = {
+					latitude: data.lat,
+					longitude: data.lng
+				};
+				this.latestNeutralDuration.top_speed = data.speed > this.latestNeutralDuration.top_speed ? data.speed : this.latestNeutralDuration.top_speed;
+				const duration = data.datetime - this.latestNeutralDuration.datetime;
+				this.latestNeutralDuration.duration = duration / 1000;
+				if(parseInt(this.latestNeutralDuration.duration) > 120){//duration greater than 25 seconds
+					addressService.upsertAlerts(getCopy(this.latestNeutralDuration),function(err,resp){});
+					if(this.latestNeutralDuration.imei == 862549046024132){
+						console.log('free wheeling',this.latestNeutralDuration.duration);
+					}
+				}
+			}
+		} else if (this.latestNeutralDuration) {
+			const duration = data.datetime - this.latestNeutralDuration.datetime;
+			this.latestNeutralDuration.duration = duration / 1000;
+			this.latestNeutralDuration.end_time = data.datetime;
+			this.latestNeutralDuration.stop = {
+				latitude: data.lat,
+				longitude: data.lng
+			};
+			this.latestNeutralDuration.extra = this.latestNeutralDuration.duration;
+			if(parseInt(this.latestNeutralDuration.duration) > 120){//duration greater than 25 seconds
+				addressService.upsertAlerts(getCopy(this.latestNeutralDuration),function(err,resp){});
+				//emailService.sendAlertMails(getCopy(this.latestNeutralDuration));
+				if(this.latestNeutralDuration.imei == 862549046024132){
+					console.log('free wheeling',this.latestNeutralDuration.duration);
+				}
+			}
+			this.latestNeutralDuration = null;
 		}
 	}
 
@@ -1158,7 +1454,7 @@ class Device {
 					if(geofence_points && geofence_points[0] && geofence_points[0].user_id){
 						that.user_id = geofence_points[0].user_id;
 					}else{
-						//console.error('no gpsId found',that.user_id);
+						console.error('no gpsId found',that.user_id);
 					}
 					//console.log('geofence_points found for trip alarm',this.user_id,this.getUID(),geofence_points.length);
                     for (let i = 0; i < geofence_points.length; i++) {
@@ -1174,6 +1470,12 @@ class Device {
 						that.tripAlertSettings.push(geofence_points[i]);
                     }
                 }).catch(err => {
+				if(this.getUID() == this.logOne) {
+					console.error(new Date(),'getTripAlarms error ',err.message);
+					if(this.logFile){
+						fs.appendFile(this.model_name+'-'+this.getUID()+'.txt', new Date() + '  getTripAlarms error : ' + err.message  + '\n', function (err) {});
+					}
+				}
             }).then(() => {
                 if (done) done();
             });

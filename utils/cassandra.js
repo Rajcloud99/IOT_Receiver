@@ -10,7 +10,7 @@ const async = require('async');
 exports.insertGPSData = function (data) {
 	if (!config.shouldConnectToDb) return;
 	if(!data || !data.lat || !data.lng || !data.datetime) {
-        winston.error('insert gps data error:' + data.device_id);
+        winston.error('insert gps data error:' + data.device_id,data.lat,data.lng);
 		return;
     }
 	const query = 'INSERT INTO ' + database.table_gps_data + ' (device_id, satellites, latitude, longitude, speed, real_time, gps_tracking, course, mcc, mnc, lac, cid, datetime, inserted,ignition,input_state,sb,power_supply,fl,f_lvl) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
