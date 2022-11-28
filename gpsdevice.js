@@ -244,12 +244,11 @@ class Device {
 		// var existingDevice = servers[options.type].find_device(device_id);   Handle this properly later
 
 		this.server.add_device(this);
-		setTimeout(() => {
 			this.getAlarms();
             //this.updateDistanceToday();
 			cassandra.insertServerIpAndStatus(this.getUID(), externalip, this.port, this.model_name);
 			this.updateStatus(msg_parts);
-		}, genUtils.getRandomIntInclusive(0, 6000));
+
 
 		socketServer.deviceConnected(this.getUID());
      	// winston.info(this.model_name + ' TOTAL CONNECTED DEVICES: ' + this.server.getNumOfActiveConnections());
