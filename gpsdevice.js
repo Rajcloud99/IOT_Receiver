@@ -244,14 +244,10 @@ class Device {
 		// var existingDevice = servers[options.type].find_device(device_id);   Handle this properly later
 
 		this.server.add_device(this);
-			this.getAlarms();
-            //this.updateDistanceToday();
-			cassandra.insertServerIpAndStatus(this.getUID(), externalip, this.port, this.model_name);
-			this.updateStatus(msg_parts);
-
-
+		this.getAlarms();
+		cassandra.insertServerIpAndStatus(this.getUID(), externalip, this.port, this.model_name);
+		this.updateStatus(msg_parts);
 		socketServer.deviceConnected(this.getUID());
-     	// winston.info(this.model_name + ' TOTAL CONNECTED DEVICES: ' + this.server.getNumOfActiveConnections());
 	}
 
 	login_authorized(val, msg_parts) {
@@ -1311,7 +1307,7 @@ class Device {
 					if(geofence_points && geofence_points[0] && geofence_points[0].user_id){
 						that.user_id = geofence_points[0].user_id;
 					}else{
-						console.error('no gpsId found',that.user_id);
+						//console.error('no gpsId found',that.user_id);
 					}
 					//console.log('geofence_points found for trip alarm',this.user_id,this.getUID(),geofence_points.length);
                     for (let i = 0; i < geofence_points.length; i++) {
