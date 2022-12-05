@@ -66,6 +66,8 @@ class adapter{
                 //this.send_command(this.getCommandCustom(recs.toString()));
                 i++;
                 //  console.log(codec, recs);
+                let dt = new Date();
+                dt.toLocaleString();
                 if (codec == 0x08) {
                     for (var n = 0; n < recs; n++) {
                         if(!parts.action){
@@ -324,8 +326,11 @@ class adapter{
                                     {
                                         var value = converter.bytesToInt(buf, i, 2);
                                         position.a_input_1=value/1000;
-                                        if(this.device.getUID() == this.device.logOne){
-                                            console.log(this.device.logOne,'position.a_input_1  ',position.a_input_1);
+                                        if (this.device.getUID() == this.device.logOne) {
+                                            let msg = dt + '8e a_input_1 : ' + position.a_input_1 + '\n';
+                                            console.log(msg);
+                                            fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                            });
                                         }
                                         i += 2;
                                         break;
@@ -334,8 +339,11 @@ class adapter{
                                     {
                                         var value = converter.bytesToInt(buf, i, 2);
                                         position.a_input_2=value/1000;
-                                        if(this.device.getUID() == this.device.logOne){
-                                            console.log(this.device.logOne,'position.a_input_2  ',position.a_input_2);
+                                        if (this.device.getUID() == this.device.logOne) {
+                                            let msg = dt + ' a_input_2 : ' + position.a_input_2 + '\n';
+                                            console.log(msg);
+                                            fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                            });
                                         }
                                         i += 2;
                                         break;
@@ -344,8 +352,11 @@ class adapter{
                                     {
                                         var value = converter.bytesToInt(buf, i, 2);
                                         position.a_input_3=value/1000;
-                                        if(this.device.getUID() == this.device.logOne){
-                                            console.log(this.device.logOne,'position.a_input_3  ',position.a_input_3);
+                                        if (this.device.getUID() == this.device.logOne) {
+                                            let msg = dt + ' a_input_3 : ' + position.a_input_3 + '\n';
+                                            console.log(msg);
+                                            fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                            });
                                         }
                                         i += 2;
                                         break;
@@ -628,7 +639,10 @@ class adapter{
                                             var value = converter.bytesToInt(buf, i, 2);
                                             position.a_input_1 = value / 1000;
                                             if (this.device.getUID() == this.device.logOne) {
-                                                console.log(this.device.logOne, 'position.a_input_1  ', position.a_input_1);
+                                                let msg = dt + ' a_input_1 : ' + position.a_input_1 + '\n';
+                                                console.log(msg);
+                                                fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                                });
                                             }
                                             i += 2;
                                             break;
@@ -637,7 +651,10 @@ class adapter{
                                             var value = converter.bytesToInt(buf, i, 2);
                                             position.a_input_2 = value / 1000;
                                             if (this.device.getUID() == this.device.logOne) {
-                                                console.log(this.device.logOne, 'position.a_input_2  ', position.a_input_2);
+                                                let msg = dt + ' a_input_2 : ' + position.a_input_2 + '\n';
+                                                console.log(msg);
+                                                fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                                });
                                             }
                                             i += 2;
                                             break;
@@ -646,7 +663,10 @@ class adapter{
                                             var value = converter.bytesToInt(buf, i, 2);
                                             position.a_input_3 = value / 1000;
                                             if (this.device.getUID() == this.device.logOne) {
-                                                console.log(this.device.logOne, 'position.a_input_3  ', position.a_input_3);
+                                                let msg = dt + ' a_input_3 : ' + position.a_input_3 + '\n';
+                                                console.log(msg);
+                                                fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                                });
                                             }
                                             i += 2;
                                             break;
@@ -655,11 +675,12 @@ class adapter{
                                         case 13: {
                                             var value = converter.bytesToInt(buf, i, 2);
                                             position.afu = value;
-                                            console.log(this.device.logOne, ' position.avg_fuel_used  ', position.afu);
-                                            fs.appendFile('fmb920_avg_fuel_used' + this.device.logOne + '.txt', new Date() + ' : ' + position.afu + '\n', function (err) {
-                                            });
+
                                             if (this.device.getUID() == this.device.logOne) {
-                                                //  console.log(this.device.logOne,'position.a_input_3  ',position.a_input_3);
+                                                let msg = dt + ' afu : ' + position.afu + '\n';
+                                                console.log(msg);
+                                                fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                                });
                                             }
                                             i += 2;
                                             break;
@@ -673,8 +694,6 @@ class adapter{
                                                 position.f_lvl = this.device.fuel_sensor_m_fact * position.fl;
                                             }
 
-                                            let dt = new Date();
-                                            dt.toLocaleString();
                                             if (this.device.getUID() == this.device.logOne) {
                                                 let msg = dt + ' : ' + position.fl + ' f_lvl ' + position.f_lvl + ' m_fact ' + this.device.fuel_sensor_m_fact + '\n';
                                                 console.log(msg);
@@ -715,11 +734,11 @@ class adapter{
 
                                             var value = converter.bytesToInt(buf, i, 4);
                                             position.fuel_used_gps = value;
-                                            console.log(this.device.logOne, '12 position.fuel_used_gps  ', position.fuel_used_gps);
-                                            fs.appendFile('fmb920_fuel_used_gps' + this.device.logOne + '.txt', new Date() + ' : ' + position.fuel_used_gps + '\n', function (err) {
-                                            });
                                             if (this.device.getUID() == this.device.logOne) {
-                                                //  console.log(this.device.logOne,'position.a_input_3  ',position.a_input_3);
+                                                let msg = dt + ' fuel_used_gps : ' + position.fuel_used_gps + '\n';
+                                                console.log(msg);
+                                                fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                                });
                                             }
                                             i += 4;
                                             break;

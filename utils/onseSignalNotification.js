@@ -27,8 +27,7 @@ exports.sendOneSignalNotification = function(oNotif,callback){
             }
 
         }).catch(function (err) {
-        // Deal with the error
-        console.error(' error in sendOneSignalNotification',err.message);
+            console.error(' error in sendOneSignalNotification',err);
         if(callback){
             callback(err);
         }

@@ -668,6 +668,7 @@ exports.processADASReportV2ForDeviceAsync = (data) => {
         });
     });
 };
+
 exports.processADASReportV2ForDevice = function(data, callback) {
     for (let i = 0; i < data.length; i++) {
         if (!data[i].drive && data[i].distance > 200 && (data[i].distance / data[i].duration * 3.6) > 10) {

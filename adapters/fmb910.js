@@ -186,8 +186,13 @@ class adapter{
                             i++;
                             for (var j = 0; j < cnt; j++) {
                                 var id = converter.bytesToInt(buf, i, 1);
+
                                 i++;
                                 //Add output status
+                                if (this.device.getUID() == this.device.logOne) {
+                                    console.log( 'id 1 byte',id);
+                                    console.log(' val 1 byte ',converter.bytesToInt(buf, i, 1))
+                                }
 
                                 switch (id) {
                                     case 239:
@@ -225,7 +230,7 @@ class adapter{
                                     case 'GSM':
                                     {
                                         var value = converter.bytesToInt(buf, i, 1);
-                                       // position.status += string.format(",GSM {0}", value);
+                                        // position.status += string.format(",GSM {0}", value);
                                         i++;
                                         break;
                                     }
@@ -277,7 +282,7 @@ class adapter{
                                     {
                                         parts.action = "alarm";
                                         parts.cmd = '03';
-                                       // tbs.sendMessage('accelerometer reading' + new Date() + ' imei '+ position.device_id);
+                                        // tbs.sendMessage('accelerometer reading' + new Date() + ' imei '+ position.device_id);
                                         var value = converter.bytesToInt(buf, i, 1);
                                         //console.log('accelerometer reading', 254,value);
                                         switch (value) {
@@ -352,13 +357,18 @@ class adapter{
                                 i++;
                                 //    console.log('id 2byte', id,bytesToInt(buf, i, 2));
                                 id =parseInt(id);
+                                if (this.device.getUID() == this.device.logOne) {
+                                    console.log( 'id 2 byte',id);
+                                    console.log(' val 1 byte ',converter.bytesToInt(buf, i, 2));
+                                }
+
                                 switch (id) {
                                     case 66:
                                     {
                                         var value = converter.bytesToInt(buf, i, 2);
                                         position.battery=value/1000;
                                         //if (value < 12)
-                                          //  position.alarm += string.format("Low voltage", value);
+                                        //  position.alarm += string.format("Low voltage", value);
                                         i += 2;
                                         break;
                                     }
@@ -373,8 +383,26 @@ class adapter{
                                     {
                                         var value = converter.bytesToInt(buf, i, 2);
                                         position.a_input_1=value/1000;
-                                        if(this.device.getUID() == this.device.logOne){
-                                            console.log(this.device.logOne,'position.a_input_1  ',position.a_input_1);
+                                        if (this.device.getUID() == this.device.logOne) {
+                                            let msg = dt + '8e a_input_1 : ' + position.a_input_1 + '\n';
+                                            console.log(msg);
+                                            fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                            });
+                                        }
+                                        i += 2;
+                                        break;
+                                    }
+                                    case 6:
+                                    {
+                                        var value = converter.bytesToInt(buf, i, 2);
+                                        position.a_input_2=value/1000;
+                                        let msg = dt + '8e a_input_2 : ' + position.a_input_2 + '\n';
+                                        console.log(msg);
+                                        if (this.device.getUID() == this.device.logOne) {
+                                            let msg = dt + '8e a_input_2 : ' + position.a_input_2 + '\n';
+                                            console.log(msg);
+                                            fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                            });
                                         }
                                         i += 2;
                                         break;
@@ -383,8 +411,11 @@ class adapter{
                                     {
                                         var value = converter.bytesToInt(buf, i, 2);
                                         position.a_input_2=value/1000;
-                                        if(this.device.getUID() == this.device.logOne){
-                                            console.log(this.device.logOne,'position.a_input_2  ',position.a_input_2);
+                                        if (this.device.getUID() == this.device.logOne) {
+                                            let msg = dt + ' a_input_2 : ' + position.a_input_2 + '\n';
+                                            console.log(msg);
+                                            fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                            });
                                         }
                                         i += 2;
                                         break;
@@ -393,8 +424,11 @@ class adapter{
                                     {
                                         var value = converter.bytesToInt(buf, i, 2);
                                         position.a_input_3=value/1000;
-                                        if(this.device.getUID() == this.device.logOne){
-                                            console.log(this.device.logOne,'position.a_input_3  ',position.a_input_3);
+                                        if (this.device.getUID() == this.device.logOne) {
+                                            let msg = dt + ' a_input_3 : ' + position.a_input_3 + '\n';
+                                            console.log(msg);
+                                            fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                            });
                                         }
                                         i += 2;
                                         break;
@@ -423,8 +457,12 @@ class adapter{
                             i++;
                             for (var j = 0; j < cnt; j++) {
                                 var id = converter.bytesToInt(buf, i, 1);
-                                i++;
 
+                                i++;
+                                if (this.device.getUID() == this.device.logOne) {
+                                    console.log( 'id 4 byte',id);
+                                    console.log(' val 4 byte ',converter.bytesToInt(buf, i, 4))
+                                }
 
                                 switch (parseInt(id)) {
                                     case 'TEMPERATURE':
@@ -457,10 +495,14 @@ class adapter{
                             i++;
                             for (var j = 0; j < cnt; j++) {
                                 var id = converter.bytesToInt(buf, i, 1);
-                                i++;
 
+                                i++;
+                                if (this.device.getUID() == this.device.logOne) {
+                                    console.log( 'id 8 byte',id);
+                                    console.log(' val 8 byte ',converter.bytesToInt(buf, i, 8));
+                                }
                                 var io = converter.bytesToInt(buf, i, 8);
-                               // position.status += string.format(",{0} {1}", id, io);
+                                // position.status += string.format(",{0} {1}", id, io);
                                 i += 8;
                             }
                         }
@@ -469,12 +511,378 @@ class adapter{
                         //var imei = socket.device_imei;
 
                         if ((position.lng != 0 || position.lat != 0) &&  (position.datetime instanceof Date)) {
-                           // var resData = {  utcDateTime: position.timestamp, lat: position.lat, lng: position.lng, altitude: position.alt, orientation: position.dir, speed: position.speed,acc:position.acc,battery:position.battery,out2:position.out2,sos:position.sos,a_input_1:position.a_input_1,a_input_2:position.a_input_2,a_input_3:position.a_input_3,p:position };
+                            // var resData = {  utcDateTime: position.timestamp, lat: position.lat, lng: position.lng, altitude: position.alt, orientation: position.dir, speed: position.speed,acc:position.acc,battery:position.battery,out2:position.out2,sos:position.sos,a_input_1:position.a_input_1,a_input_2:position.a_input_2,a_input_3:position.a_input_3,p:position };
                             position.datetime = position.datetime.getTime();
+                            if (this.device.getUID() == this.device.logOne) {
+                                console.log(position);
+                            }
                             gps.push(position);
                             parts.data = position;
                             parts.aData = gps;
                             //console.log(position.datetime);
+                        }
+                    }
+                }else if (codec == 0x8E) {
+                    for (var n = 0; n < recs; n++) {
+                        try {
+                            if (!parts.action) {
+                                parts.action = "ping";
+                                parts.cmd = '02';
+                            }
+                            var position = {};
+                            position.datetime = converter.bytesToInt(buf, i, 8);
+                            position.datetime = new Date(position.datetime);
+                            position.device_id = this.device.getUID() || this.device.uid;
+
+                            i += 8;
+
+                            position.priority = converter.bytesToInt(buf, i, 1);
+                            i++;
+
+                            position.lng = converter.bytesToIntDemo(buf, i, 4) / 10000000.0;
+                            //  console.info('lng', bytesToIntDemo(buf, i, 4));
+
+
+                            i += 4;
+
+                            position.lat = converter.bytesToIntDemo(buf, i, 4) / 10000000.0;
+                            //  bytesToIntDemo(buf, i, 4)
+                            i += 4;
+
+                            position.altitude = converter.bytesToInt(buf, i, 2);
+                            i += 2;
+
+                            position.dir = converter.bytesToInt(buf, i, 2);
+                            position.course = position.dir;
+                            position.direction = 0;
+                            i += 2;
+
+                            if (position.dir < 90)
+                                position.direction = 1;
+                            else if (position.dir == 90)
+                                position.direction = 2;
+                            else if (position.dir < 180)
+                                position.direction = 3;
+                            else if (position.dir == 180)
+                                position.direction = 4;
+                            else if (position.dir < 270)
+                                position.direction = 5;
+                            else if (position.dir == 270)
+                                position.direction = 6;
+                            else if (position.dir > 270)
+                                position.direction = 7;
+
+                            position.satellites = converter.bytesToInt(buf, i, 1);
+                            i++;
+
+                            position.status = "";
+                            position.alarm = "";
+
+                            if (position.satellite >= 3)
+                                position.status = "A";
+                            else
+                                position.status = "L";
+
+                            position.speed = converter.bytesToInt(buf, i, 2);
+                            i += 2;
+//0000 – IO element ID of Event generated (in this case when 0000 – data generated not on event) - 2bytes
+                            position.ioEvent = converter.bytesToInt(buf, i, 2);
+                            i += 2;
+                            //   IO elements in record (total) - 2 bytes
+                            position.ioCount = converter.bytesToInt(buf, i, 2);
+                            i += 2;
+// IO elements list
+                            //https://wiki.teltonika-gps.com/wikibase/index.php?title=FMB920_Teltonika_Data_Sending_Parameters_ID&mobileaction=toggle_view_desktop
+                            //read 1 byte
+                            {
+                                // no of IO elements, which length is 1 Byte
+                                var cnt = converter.bytesToInt(buf, i, 2);
+                                i += 2;
+
+                                for (var j = 0; j < cnt; j++) {
+                                    //IO element ID 2 byte
+                                    var id = converter.bytesToInt(buf, i, 2);
+                                    i += 2;
+                                    //Add output status
+                                    //IO element’s value 1 byte
+                                    switch (id) {
+                                        case 239: {
+                                            var value = converter.bytesToInt(buf, i, 1);
+                                            position.ignition = value == 1 ? 1 : 0;
+                                            i++;
+                                            break;
+                                        }
+                                        case 180: {
+                                            var value = converter.bytesToInt(buf, i, 1);
+                                            position.out2 = value == 1 ? 1 : 0;
+                                            i++;
+                                            break;
+                                        }
+                                        case 2: {
+                                            var value = converter.bytesToInt(buf, i, 1);
+                                            position.sos = value == 1 ? 1 : 0;
+                                            if (value == 1) {
+                                                console.log('FMB 920 SOS  ', this.device.getUID());
+                                                parts.action = "alarm";
+                                                position.alarm = 'sos';
+                                                parts.cmd = 'sos';
+                                            }
+                                            if (this.device.getUID() == this.device.logOne && value == 1) {
+                                                console.log(this.device.logOne, 'SOS value ', position.sos);
+                                                fs.appendFile('fmb920' + this.device.logOne + '.txt', new Date() + ' SOS: ' + parts.org.toString('hex') + '\n', function (err) {
+                                                });
+                                            }
+                                            i++;
+                                            break;
+                                        }
+                                        case 253: {
+                                            parts.action = "alarm";
+                                            parts.cmd = '03';
+                                            //tbs.sendMessage('accelerometer reading' + new Date() + ' imei '+ position.device_id);
+                                            var value = converter.bytesToInt(buf, i, 1);
+                                            //console.log('accelerometer reading', 253,value);
+                                            switch (value) {
+                                                case 1: {
+                                                    position.alarm = "ha";
+                                                    break;
+                                                }
+                                                case 2: {
+                                                    position.alarm = "hb";
+                                                    break;
+                                                }
+                                                case 3: {
+                                                    position.alarm = "rt";
+                                                    break;
+                                                }
+                                                default:
+                                                    break;
+                                            }
+                                            i++;
+                                            break;
+                                        }
+                                        case 254: {
+                                            parts.action = "alarm";
+                                            parts.cmd = '03';
+                                            // tbs.sendMessage('accelerometer reading' + new Date() + ' imei '+ position.device_id);
+                                            var value = converter.bytesToInt(buf, i, 1);
+                                            //console.log('accelerometer reading', 254,value);
+                                            switch (value) {
+                                                case 1: {
+                                                    position.alarm = "ha";
+                                                    break;
+                                                }
+                                                case 2: {
+                                                    position.alarm = "hb";
+                                                    break;
+                                                }
+                                                case 3: {
+                                                    position.alarm = "rt";
+                                                    break;
+                                                }
+                                                default:
+                                                    break;
+                                            }
+                                            i++;
+                                            break;
+                                        }
+                                        default: {
+                                            i++;
+                                            break;
+                                        }
+                                    }
+
+                                }
+                            }
+
+                            //read 2 byte
+                            {
+                                // IO elements, which length is 2 Byte
+                                var cnt = converter.bytesToInt(buf, i, 2);
+                                i += 2;
+                                for (var j = 0; j < cnt; j++) {
+                                    // IO element ID - 2 byte
+                                    var id = converter.bytesToInt(buf, i, 2);
+                                    i += 2;
+                                    //    console.log('id 2byte', id,bytesToInt(buf, i, 2));
+                                    id = parseInt(id);
+                                    //IO element’s value 2 byte
+                                    switch (id) {
+                                        case 66: {
+                                            var value = converter.bytesToInt(buf, i, 2);
+                                            position.battery = value / 1000;
+                                            //  if (value < 12)
+                                            //      position.alarm += string.format("Low voltage", value);
+                                            i += 2;
+                                            break;
+                                        }
+                                        case 67: {
+                                            var value = converter.bytesToInt(buf, i, 2);
+                                            position.battery_int = value / 1000;
+                                            i += 2;
+                                            break;
+                                        }
+                                        case 9: {
+                                            var value = converter.bytesToInt(buf, i, 2);
+                                            position.a_input_1 = value / 1000;
+                                            if (this.device.getUID() == this.device.logOne) {
+                                                let msg = dt + ' a_input_1 : ' + position.a_input_1 + '\n';
+                                                console.log(msg);
+                                                fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                                });
+                                            }
+                                            i += 2;
+                                            break;
+                                        }
+                                        case 10: {
+                                            var value = converter.bytesToInt(buf, i, 2);
+                                            position.a_input_2 = value / 1000;
+                                            if (this.device.getUID() == this.device.logOne) {
+                                                let msg = dt + ' a_input_2 : ' + position.a_input_2 + '\n';
+                                                console.log(msg);
+                                                fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                                });
+                                            }
+                                            i += 2;
+                                            break;
+                                        }
+                                        case 11: {
+                                            var value = converter.bytesToInt(buf, i, 2);
+                                            position.a_input_3 = value / 1000;
+                                            if (this.device.getUID() == this.device.logOne) {
+                                                let msg = dt + ' a_input_3 : ' + position.a_input_3 + '\n';
+                                                console.log(msg);
+                                                fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                                });
+                                            }
+                                            i += 2;
+                                            break;
+                                        }
+
+                                        case 13: {
+                                            var value = converter.bytesToInt(buf, i, 2);
+                                            position.afu = value;
+
+                                            if (this.device.getUID() == this.device.logOne) {
+                                                let msg = dt + ' afu : ' + position.afu + '\n';
+                                                console.log(msg);
+                                                fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                                });
+                                            }
+                                            i += 2;
+                                            break;
+                                        }
+                                        //   270 - Escort LLS Fuel level #1
+                                        case 270: {
+                                            var value = converter.bytesToInt(buf, i, 2);
+                                            position.fl = value;
+                                            i += 2;
+                                            if (this.device.fuel_sensor_m_fact) {
+                                                position.f_lvl = this.device.fuel_sensor_m_fact * position.fl;
+                                            }
+
+                                            if (this.device.getUID() == this.device.logOne) {
+                                                let msg = dt + ' : ' + position.fl + ' f_lvl ' + position.f_lvl + ' m_fact ' + this.device.fuel_sensor_m_fact + '\n';
+                                                console.log(msg);
+                                                fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                                });
+                                            }
+                                            break;
+                                        }
+                                        default: {
+                                            i += 2;
+                                            break;
+                                        }
+
+                                    }
+                                }
+                            }
+
+                            //read 4 byte
+                            {
+                                // IO elements, which length is 4 Byte - 2 byte
+                                var cnt = converter.bytesToInt(buf, i, 2);
+                                i += 2;
+                                for (var j = 0; j < cnt; j++) {
+                                    // IO element ID 2 byte
+                                    var id = converter.bytesToInt(buf, i, 2);
+                                    i += 2;
+
+                                    // io element value 4 byte
+                                    switch (parseInt(id)) {
+                                        case 199: {
+
+                                            var value = converter.bytesToInt(buf, i, 4);
+                                            position.mileage = value;
+                                            i += 4;
+                                            break;
+                                        }
+                                        case 12: {
+
+                                            var value = converter.bytesToInt(buf, i, 4);
+                                            position.fuel_used_gps = value;
+                                            if (this.device.getUID() == this.device.logOne) {
+                                                let msg = dt + ' fuel_used_gps : ' + position.fuel_used_gps + '\n';
+                                                console.log(msg);
+                                                fs.appendFile('fmb920_escort_fuel_level_1' + this.device.logOne + '.txt', msg, function (err) {
+                                                });
+                                            }
+                                            i += 4;
+                                            break;
+                                        }
+                                        default: {
+                                            i += 4;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            //read 8 byte
+                            {
+                                //io element length of 8 byte
+                                var cnt = converter.bytesToInt(buf, i, 2);
+                                i += 2;
+                                for (var j = 0; j < cnt; j++) {
+                                    //io element id 2 byte
+                                    var id = converter.bytesToInt(buf, i, 2);
+                                    i += 2;
+// io value of 8 bytes
+                                    var io = converter.bytesToInt(buf, i, 8);
+                                    // position.status += string.format(",{0} {1}", id, io);
+                                    i += 8;
+                                }
+                            }
+
+                            //read X byte
+                            {
+                                var cnt = converter.bytesToInt(buf, i, 2);
+                                i += 2;
+                                for (var j = 0; j < cnt; j++) {
+                                    var id = converter.bytesToInt(buf, i, 2);
+                                    i += 2;
+                                    var idLenth = converter.bytesToInt(buf, i, 2);
+                                    i += 2;
+
+                                    var io = converter.bytesToInt(buf, i, idLenth);
+                                    // position.status += string.format(",{0} {1}", id, io);
+                                    i += idLenth;
+                                }
+                            }
+
+                            if (this.device.getUID() == this.device.logOne) {
+                                console.log('fmb920 position data pos1 ', position.lng, position.lat, position.datetime);
+                            }
+                            if ((position.lng != 0 && position.lat != 0) && (position.datetime instanceof Date)) {
+                                position.datetime = position.datetime.getTime();
+                                gps.push(position);
+                                parts.data = position;
+                                parts.aData = gps;
+                                if (this.device.getUID() == this.device.logOne) {
+                                    console.log('fmb920 position data pos2', position.f_lvl, position.fl);
+                                }
+                            }
+                        } catch (e) {
+                            console.error('error from fmb 920 loop', e.message, e);
                         }
                     }
                 }

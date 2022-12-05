@@ -95,6 +95,7 @@ function handleData(data, socket){
 		case feedtype.live_feed:
 			if (!servers[data.t]) return;
 			socket.feedRequestsForDevice[data.d] = true;
+			break;
         case feedtype.live_feedV2:
         	//console.log('live_feedV2',data.d);
             if (!servers[data.t]) return;
