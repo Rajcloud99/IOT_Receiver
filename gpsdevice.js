@@ -1185,8 +1185,8 @@ class Device {
 					});
 				}
 			}
-			this.updateBooleanReportsForPowerSupply(getCopy(this.latestPower));
 			this.latestPower.power_supply = data.power_supply;
+			this.updateBooleanReportsForPowerSupply(getCopy(this.latestPower));
 		}else{
 			if(this.getUID() == this.logOne) {
 				if (this.logFile) {
@@ -1197,24 +1197,73 @@ class Device {
 			}
 			this.latestPower.power_supply = data.power_supply;
 			this.power_supply = data.power_supply;
-
 		}
 	}
 
 	processFuelData(data){
 		//todo check with duration
      	let dur = (data.datetime - this.latestLocation.datetime) / 1000;
-		 if(dur < 1200){//20*60 20 min
+		 let fAlert = false;
+		 let fType = "";
+		 if(dur < 60){//20*60 20 min
 			 //check only for
 			 let diffLvl =  data.f_lvl - this.f_lvl;
 			 if(diffLvl > 5){
 				 //refilling
 				 console.log('Fuel refilling ' + this.reg_no + " " + diffLvl);
+				 fAlert = true;
+				 fType = 'Fuel refilling';
+				 tbs.sendMessage('Fuel refilling ' + this.reg_no + " " + diffLvl);
 			 }else if(diffLvl < -5){
 				 console.log('Fuel Draining ' + this.reg_no + " " + diffLvl);
+				 fAlert = true;
+				 fType = 'Fuel Draining';
+				 tbs.sendMessage('Fuel Draining ' + this.reg_no + " " + diffLvl);
 			 }
 		 }
 		this.f_lvl = data.f_lvl;
+		 let that = this;
+		 if(fAlert){
+			 const alarm = {
+				 imei: data.device_id || this.getUID(),
+				 reg_no: this.reg_no,
+				 user_id: this.user_id,
+				 datetime: new Date(data.datetime),
+				 model_name: this.model_name,
+				 location: {
+					 lat: data.lat || this.latestLocation.lat,
+					 lng: data.lng || this.latestLocation.lng,
+					 address: this.address || this.latestLocation.address,
+					 speed: data.speed || this.latestLocation.speed,
+					 course: data.course || this.latestLocation.course
+				 }
+			 };
+			 if(fType = 'Fuel refilling'){
+				 alarm.code = 'refill';
+				 alarm.msg = fType + " for " + this.reg_no;
+			 }else{
+				 alarm.code = 'drain';
+				 alarm.msg = fType + " for " + this.reg_no;
+			 }
+			 addressService.upsertAlerts(alarm, (err, resp) => {
+				 if (err) {
+					 tbs.sendMessage('upsertAlerts error findEligibleLmsGeozones ', err.toString());
+					 console.error('upsertAlerts error', err);
+				 }
+				 let oNotif = {
+					 "include_external_user_ids": [that.user_id],
+					 "contents": {
+						 "en": alarm.msg
+					 },
+					 "data": {
+						 reg_no: that.reg_no,
+						 user_id: that.user_id,
+					 },
+					 "name": fType
+				 };
+				 oneSignalNotification.sendOneSignalNotification(oNotif);
+			 });
+		 }
 	}
 
 	handleDisconnection() {
@@ -1751,7 +1800,7 @@ class Device {
 						let oNotif = {
 							"include_external_user_ids": [that.user_id],
 							"contents": {
-								"en": oAlarm.msg
+								"en": oAlarm.message
 							},
 							"data": {
 								reg_no: that.reg_no,
@@ -2020,7 +2069,7 @@ class Device {
 			let oNotif = {
 				"include_external_user_ids": [alarm.user_id],
 				"contents": {
-					"en": alarm.msg
+					"en": alarm.reg_no + " " + alarm.msg + " at " + (this.latestLocation && this.latestLocation.address)
 				},
 				"data": {
 					reg_no: alarm.reg_no,
