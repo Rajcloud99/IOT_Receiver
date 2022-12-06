@@ -77,7 +77,7 @@ class adapter{
         } else {
             buf = converter.stringToBytes(data);
         }
-       // fs.appendFile('fmb910.txt', new Date() + ' : '+ data+'\n', function (err) {});
+        // fs.appendFile('fmb910.txt', new Date() + ' : '+ data+'\n', function (err) {});
         const parts = {org:buf};
 
         let start = converter.bytesToInt(buf, 0, 2);
@@ -92,7 +92,7 @@ class adapter{
         }else{
             //console.log(buf.toString('hex'));
             let hexData = buf.toString('hex');
-           // fs.appendFile('fmb910.txt', new Date() + ' : '+ hexData+'\n', function (err) {});
+            // fs.appendFile('fmb910.txt', new Date() + ' : '+ hexData+'\n', function (err) {});
             let gps = [];
             let sizeAVL = converter.bytesToInt(buf, 4, 4);
 
@@ -102,6 +102,8 @@ class adapter{
 
             let i = 8;
             parts.device_id = this.device.getUID();
+            let dt  = new Date();
+            dt = dt.toString();
             if (sizeAVL == buf.length - 4 * 3 && rCRC == cCRC) {
 
                 let codec = converter.bytesToInt(buf, i, 1);
@@ -896,7 +898,7 @@ class adapter{
                 let writer = new binutils.BinaryWriter();
                 writer.WriteInt32(recs);
                 this.device.send(writer.ByteBuffer);
-        }
+            }
         }
         if(this.device.getUID() == this.device.logOne){
             //console.log(this.device.logOne,parts.org);
@@ -1000,7 +1002,7 @@ class adapter{
                 acc.acc_high = false;
                 break;
         }
-       // this.device.updateBooleanReport('acc', acc.acc_high, acc.datetime);
+        // this.device.updateBooleanReport('acc', acc.acc_high, acc.datetime);
         return acc;
     }
 
